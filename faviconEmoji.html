@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Emoji cosplays Favicon</title>
+        <link rel="icon" type="image/x-icon" href=""> <!-- href attribute will be set by JS. -->
+    </head>
+    <body>
+        <script>
+//*******************************************************************
+function emojiToFavicon(emoji){
+    const canvasElem = document.createElement("canvas");
+    const ctx = canvasElem.getContext("2d"); // creates 2D context object with drawing methods.
+    canvasElem.width = 32; // can be 16 (16px is standard favicon size)
+    canvasElem.height = 32;
+    //document.querySelector("body").append(canvasElem); // this line was needed to position (calibrate) emoji in center on 32x32 pixel canvas. i.e. in experimental way to find numbers for ctx.font and ctx.fillText.
+    ctx.font = "26px Arial"; // set size of emoji to fit  32x32px canvas
+    ctx.fillText(emoji,-2,25); // draw emoji on canvas.
+    const imgElem = new Image(); // the Image() constructor creates a new HTMLImageElement instance.
+    document.querySelector("link").setAttribute("href",canvasElem.toDataURL()); // select link element, and set href attribute as a data URL containing a representation of the image on canvas.
+}
+
+// emojiToFavicon(String.fromCharCode("🐀".charCodeAt(0))); // don't works
+// emojiToFavicon(String.fromCodePoint("🐀".codePointAt(0))); // works
+// emojiToFavicon("🐴"); // set favicon as horse head.
+
+emojiToFavicon(String.fromCodePoint(128000+Math.floor(Math.random()*63))); // on each page reload set some random animal emoji as favicon image.
+//*******************************************************************
+        </script>
+    </body>
+</html>
