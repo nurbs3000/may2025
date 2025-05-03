@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Draw Rectangle on Canvas</title>
+        <style> /* internal style. */
+            *{ /* universal selector. Selects all elements. */
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box; /* include the padding and border in an element's total width and height. */
+                font: 22px Arial; /* to be readable. */
+            }
+            #wrapper{
+                width: 100vw; /* 100% of the viewport's width. */
+                height: 100vh; /* 100% of the viewport's height. */
+                display: flex; /* to organize header and main elements. */
+                flex-direction: column; /* items are displayed vertically (main axis is vertical). */
+            }
+            header{
+                width: 100%; /* 100% of the parent's width. */
+                height: 50px; /* it's enought for input elements. */
+                background-color: #112; /* your choice of color. */
+                color: beige; /* your choice of color. */
+                display: flex; /* to organize input elements inside header. */
+                justify-content: space-evenly; /* equal space around items on the main axix. */
+                align-items: center; /* items in the center on the cross axis. */
+            }
+            #choose-colors{ 
+                display: flex;
+                align-items: center;
+                column-gap: 5px;
+            }
+            button{
+                width: 70px; /* it's ok for short button's text. */
+                color: beige; /* your choice of color. */
+                background-color: #334; /* your choice of color. */
+            }
+            main{
+                width: 100%; /* 100% of the parents width. */
+                height: 100%; /* 100% of the remaining free height. */
+                background-color: #223; 
+                position: relative; /* to set canvas position absolute. */
+            }
+            canvas{
+                position: absolute; /* that way lines 140, 141 work correctly. */
+            }
+        </style>        
+    </head>
+    <body>
+        <div id="wrapper"> <!-- wrapps everything. -->
+            <header> <!-- semantic html element. Holds control elements. -->
+                <div id="choose-colors"> <!-- holds element to control color mode (random or selected for the new rectangles). -->
+                    <span>Random Color</span>
+                    <input type="radio" id="is-rnd-color" name="rbtn-color" checked autocomplete="off" style="accent-color:darkOrange">
+                    <span>Pick Color</span>
+                    <input type="radio" name="rbtn-color" autocomplete="off" style="accent-color:darkOrange">
+                    <input type="color" value="#5555aa" autocomplete="off">
+                </div>
+                <button type="button" id="prev">Prev</button> <!-- and the next 2 buttons choose some operation to perform. -->
+                <button type="button" id="next">Next</button>
+                <button type="button" id="del">Del</button>
+            </header>
+            <main> <!-- container for canvas. -->
+                <canvas id="my-canvas"></canvas> <!-- canvas in the flesh. -->
+            </main>
+        </div>
+        <script>
+//*************************** global variables **********************
+const headerElem = document.querySelector("header");
+const mainElem = document.querySelector("main");
+const canvasElem= document.querySelector("#my-canvas");
+const ctx = canvasElem.getContext("2d"); // creates 2D context object with drawing methods.
+const rectangles = []; // will be array of objects. This objects will represent rectangles on canvas. Their properties are start and end points coordinated defining the rectangle, 2 boolean flag variables, and color).
+//*************************** events ********************************
+canvasElem.addEventListener("mousedown",e=>{ // this event initialize the procedure of drawing the rectangle.
+    const color = document.querySelector("#is-rnd-color").checked ? `hsl(${Math.floor(360*Math.random())},100%,50%)` : document.querySelector('[type="color"]').value; // set the color(ternary operator is used) to random hsl, or to value of input type="color" element.
+    rectangles.push({startX: e.layerX, startY: e.layerY, currentX: e.layerX, currentY: e.layerY, isSelected: false, isFinished: false, color: color}); // push object in array, setting all its properties. isFinished flag is set to false. That flag will be used in "mousemove" event to dynamically update last rectangle in array, only if it is not finished(meaning drawing is going on - "mouseup" event is not fired yet.
+    renderAll();
+});
+canvasElem.addEventListener("mousemove",e=>{ // will update last rectanle in the rectangles array, if it is not finished.
+    if(rectangles.length === 0) return; // if no rectangles - return
+    if(rectangles[rectangles.length-1].isFinished) return; // if last rectangle is finished - return
+    rectangles[rectangles.length-1].currentX = e.layerX; // set last rectangle second(it is called current) point horizontal coordinate equal to local canvas mouse cursor coordinate.
+    rectangles[rectangles.length-1].currentY = e.layerY; // the same for vertical coordinate.
+    renderAll();
+});
+canvasElem.addEventListener("mouseup",e=>{ // mouse LMB is released. This event will must finilize the drawing procedure.
+    const lastRect = rectangles[rectangles.length-1]; // for convinience.
+    if(Math.abs(lastRect.currentX-lastRect.startX) < 3 || Math.abs(lastRect.currentY-lastRect.startY) < 3){ // check if rectangle size is too small. 
+        --rectangles.length; // in this case remove it from array.
+        return; // return from event function.
+    }
+    // if rectanlge size is ok, continue.
+    lastRect.isFinished = true; // set it as finished.
+    const selectedIdx = rectangles.findIndex(rect=>rect.isSelected); // find index (in array of objects) of the selected object representing rectangle. 
+    if(selectedIdx !== -1) rectangles[selectedIdx].isSelected = false; // if index found, set this object as not selected.
+    rectangles[rectangles.length-1].isSelected = true; // set last object in array as selected.
+    renderAll();
+});
+headerElem.addEventListener("click",e=>{ // this event will be fired by radio buttons or by regular buttons (prev, next, or del).
+    operation(e);
+});
+//*************************** logic *********************************
+function renderAll(){ // render all rectangles on canvas.
+    ctx.clearRect(0,0,canvasElem.width,canvasElem.height); // clear the canvas.
+    rectangles.forEach(rect=>{ // forEcha array method calls the function for each element(object) in the rectangles array.
+        drawRect(rect.startX, rect.startY, rect.currentX, rect.currentY, rect.color, rect.isSelected); // envoke func, passing arguments needed to draw the rectangle on canvas.
+    });
+    function drawRect(x0,y0,x1,y1,color,isSelected){ // this func will draw the rectangle.
+        ctx.fillStyle = color; // set fill color.
+        ctx.fillRect(x0,y0,x1-x0,y1-y0); // draw rectangle on canvas.
+        if(isSelected){ // if it is selected rectangle.
+            ctx.lineWidth = 3; 
+            ctx.strokeStyle = "white";
+            ctx.strokeRect(x0,y0,x1-x0,y1-y0); // draw a white border.
+        }
+    }
+}
+function operation(e){ // this function perform one of 3 possible operations.
+    if(e.target.type !== "button" || rectangles.length === 0) return; // if event was fired not by button or there is no rectangles to draw - return.
+    const selectedIdx = rectangles.findIndex(rect=>rect.isSelected); // find index of the selected rectangle.
+    let newSelIdx; // this variable will hold index of new selected rectangle depending on operation.
+    switch(e.target.id){ // 3 present regular buttons have respective IDs "prev"(previous), "next", and "del"(delete).
+        case "prev":
+            newSelIdx = selectedIdx === 0 ? 0 : selectedIdx-1; // ternary operator perform logic: if index of the selected rectangle is not 0(first object in array), reduce it by 1(previosly created rectangle).
+        break;
+        case "next":
+            newSelIdx = selectedIdx === rectangles.length-1 ? selectedIdx : selectedIdx+1; // if index of the selected rectangle is not the index of the last object in array, increase it by 1.
+        break;
+        case "del":
+            rectangles.splice(selectedIdx,1); // delete selected object.
+            newSelIdx = selectedIdx === 0 ? 0 : selectedIdx-1; // set new selected object as index of the previous.
+        break;
+    }
+    if(rectangles[selectedIdx]) rectangles[selectedIdx].isSelected = false; // if selected object exist, set it as not selected.
+    if(rectangles[newSelIdx]) rectangles[newSelIdx].isSelected = true; // if object with new index of object to be selected exist, set this object as selected.
+    renderAll();
+}
+//*************************** start here ****************************
+canvasElem.width = mainElem.offsetWidth; // set canvas widht as its container width.
+canvasElem.height = mainElem.offsetHeight; // the same for height.
+//*******************************************************************
+        </script>
+    </body>
+</html>
