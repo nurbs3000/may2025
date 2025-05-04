@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DIY Meter</title>
+        <style> /* internale style. */
+            *{ /* universal selector. Selects all elements. */
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box; /* include the padding and border in an element's total width and height. */
+            }
+            #wrapper{
+                width: 100vw; /* 100% of the viewport's width. */
+                height: 100vh; /* 100% of the vieport's height. */
+                background-image: linear-gradient(-45deg,#111,#333,dimGray); /* why not? */
+                position: relative; /* to set position: absolute; for hor and ver 'sliders'. */
+            }
+            .hor{
+                width: 300px; /* some arbitrary width. */
+                height: 30px; /* arbitrary height. */
+                left: calc(50% - 150px); /* place it in the center horizontaly. */
+                top: 40px; /* give some space above it. */
+                position: absolute; /* because CSS top and left properties have no effect on no positioned elements. */
+            }
+            .ver{
+                width: 30px; /* arbitrary width. */
+                height: 300px; /* arbitrary heigth. */
+                left: 40px; /* some space on the left. */
+                top: calc(50% - 150px); /* place it the center verticaly. */
+                position: absolute; /* for left and top properties to work. */
+            }
+            #info{ 
+                position: absolute; /* and next 2 lines do some arbitrary positioning in top left corner. */
+                left: 20px;
+                top: 20px;
+                white-space: pre-wrap; /* white-space property specifies how white-space inside element is handled. pre-wrap value let text wrap on line breaks /n */
+                font-size: 22px; /* for everyone's enjoyment. */
+            }
+        </style>
+    </head>
+    <body>
+        <div id="wrapper"> <!-- wraps all. Will occupy the whole viewport. -->
+            <div class="hor"></div> <!-- will be converted to DIY horizontal 'slider'. -->
+            <div class="ver"></div> <!-- the same, only vertical. -->
+            <div id="info"></div> <!-- display mouse cursor coordinates. -->
+        </div>
+        <script>
+//*************************** global variables **********************
+// these 2 variables to save time typing.
+wrapperElem = document.querySelector("#wrapper");
+infoElem = document.querySelector("#info");
+//*************************** events ********************************
+wrapperElem.addEventListener("mousemove",e=>{ 
+    myHorMeter.value = e.clientX; /* setter for myHorMeter object. */
+    myVerMeter.value = e.clientY; 
+    infoElem.textContent = `clientX: ${e.clientX}\nclientY: ${e.clientY}`;
+});
+//*************************** logic *********************************
+class DIYMeter{
+    constructor(divElem, min = 0, max = 100){ // special method, called automatically when a class in initiated. For furter info consult google. Topic is too big for comments. 
+        this.elem = divElem;
+        this.min = min;
+        this.max = max;
+        this.width = divElem.offsetWidth;
+        this.height = divElem.offsetHeight;
+        this.borderColor = "darkGreen"; // this color fills up the slider, as value approaches the max value.
+        this.bgColor = "firebrick"
+        if(this.width >= this.height){ // means that slide will be horizontal.
+            this.scale = this.width/(this.max-this.min); // scale to map value on div's width.
+        }else{
+            this.scale = this.height/(this.max-this.min); // the same but on div's heihgt for vertical 'slider'.
+        }
+        this.elem.style.backgroundColor = this.bgColor; // set element's background color.
+    }
+    set value(value){ // setter. That is the key point in program. Setter allows alongside with setting this.value, executed all this code in curly brackets below. It lets to resize left border(for horizonal slider) or bottom border(for vertical slide), effectively 'converting' div to <progres> or <meter> DIY HTML element!
+        value = Math.max(Math.min(value,this.max),this.min);  // clamp the value between this.min and this.max.  
+        if(this.width >= this.height){ // if it is horizontal.
+            this.elem.style.borderLeft = `${(value-this.min)*this.scale}px solid ${this.borderColor}`;
+        }else{ // else it is vertical.
+            this.elem.style.borderBottom = `${(value-this.min)*this.scale}px solid ${this.borderColor}`;
+        }
+    }
+}
+//*************************** start here ****************************
+const myHorMeter = new DIYMeter(document.querySelector(".hor"),0,wrapperElem.offsetWidth); // class DIYMeter is used to create oblect myHorMeter. This object will have setter, which allows all this mechanics to work.
+const myVerMeter = new DIYMeter(document.querySelector(".ver"),0,wrapperElem.offsetHeight); // the same for verticla DIY meter.
+//*******************************************************************
+        </script>
+    </body>
+</html>
