@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Multiline HTML Element</title>
+        <style>
+            *{ /* internal style. */
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box; /* include the padding and border in an element's total width and height. */
+            }
+            #wrapper{
+                width: 100vw; /* 100% of the viewport's width. */
+                height: 100vh; /* 100% of the viewport's height. */
+                position: relative; /* to position info div absolute. */
+                background: #010; /* your choice of color. */
+            }
+        </style>
+    </head>
+    <body>
+        <div id="wrapper"> <!-- occupy the whole viewport and wrapps everything. -->
+            <div id="info"></div> <!-- main character of my story. -->
+        </div>
+        <script>
+//*************************** global variables **********************
+const wrapperElem = document.querySelector("#wrapper");
+const pressedKeys = []; // this array will hold strings representing pressed keys.
+let clickCounter = 0; // click the number of clicks.
+//*************************** events ********************************
+document.addEventListener("mousemove",e=>{
+    info("clientX",e.clientX); // the x coordinate of the mouse in the viewport.
+    info("clientY",e.clientY); // the y coordinate.
+    info("e.buttons",e.buttons); // mouse buttons been pressed.
+});
+document.addEventListener("keydown",e=>{
+    if(!pressedKeys.includes(e.key)) pressedKeys.push(e.key); // // push the key in array only if there is no such key alreade present
+    info("pressedKeys",pressedKeys);
+});
+document.addEventListener("keyup",e=>{
+    pressedKeys.splice(pressedKeys.indexOf(e.key),1); // remove released key from the array.
+    info("pressedKeys",pressedKeys);
+});
+document.addEventListener("click",e=>{
+    info("clickCounter",++clickCounter); // increase clickCounter before passing it as second argument to function clickCounter.
+});
+//*************************** logic *********************************
+function info(name,value){ // accept 2 arguments: name and value.
+    const infoElem = document.querySelector("#info"); // select the div info element and assign it to infoElem for convenience.
+    infoElem.style = "position:absolute;white-space:pre-wrap;color:gold;margin:5px 20px;font-size:30px;" // inline style. Position absolute exclude it from normal flow, enabling overlaping. white-space: pre-wrap - text will wrap on new line.
+    if(infoElem.textContent.match(new RegExp(`\\b${name}\:`))){ // if text inside infoElem already contain such name. 
+        infoElem.textContent = infoElem.textContent.replace(new RegExp(`(?<=${name}\:).*`),` ${value}`); // replace method replace the part which follows the name: with a new value. (?<${name}\:) is 1st part of lookbehind assertion,  .* is 2nd part (. wildcard matches any character except line terminators, * is quantifier, 0 or more times)
+    }else{ // if no such name present.
+        infoElem.textContent +=`${name}: ${value}\n`;
+    }
+}
+function timeInfo(){ // this will be a callback function for setInterval.
+    const d = new Date(); // a string representin current time.
+    info("time",d.toTimeString().slice(0,8)); // toTimeString() method retuns a time portion of a date object. 
+}
+//*************************** start here ****************************
+info("wrapperElem.offsetWidth",wrapperElem.offsetWidth); // calls info passing wrapper width.
+info("wrapperElem.offsetHeight",wrapperElem.offsetHeight); // ... height.
+setInterval(timeInfo,1000); // will call timeInfo every second.
+//*******************************************************************
+        </script>
+    </body>
+</html>
