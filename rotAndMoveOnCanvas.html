@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Rotation and Movement on Canvas</title>
+        <style> /* internal style. */
+            *{ /* universal selector. Selects all elements. */
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box; /* include the padding and border in an element's total width and height. */
+            }
+            #container{
+                width: 100vw; /* 100% of the viewport's width. */
+                height: 100vh; /* 100% of the viewport's height. */
+                background-image: radial-gradient(100vw 100vw at left 20vw top 20vh, lemonChiffon,lemonChiffon 5%,rgb(52, 42, 28) 5.5%, #001 80%); /* let there be some 'start' in the background. */
+                position: relative; /* needed to position canvas: absolute. */
+            }
+            canvas{ /* there is only one canvas, so I use element selector. */ 
+                position: absolute; /* no longer exist in normal document flow. Assignments on lines 102,103 work correctly.  */
+            }
+        </style>
+    </head>
+    <body>
+        <div id="container"> <!-- is is the container for original spaceship image and canvas. -->
+            <img src="spaceship1.png" alt="" id="img-ship" style="display:none"> <!-- have size 224px(width) x 154px(height). png extension can handle transparency, that is what we need here. -->
+            <canvas id="my-canvas"><canvas> <!-- container for graphics. Notorious canvas in the flesh. -->
+        </div>
+        <script> /* embedded sciript. */
+//*************************** global variables **********************
+const contElem = document.querySelector("#container");
+const canvasElem = document.querySelector("#my-canvas");
+const ctx = canvasElem.getContext("2d"); // creates 2D context object with drawing methods.
+const imgShipElem = document.querySelector("#img-ship"); // the only one image element here.
+const pressedKeys = []; // this array will hold pressed keys. The trick is, that when key is pressed, events fires repeatedly. But we do not need multiple array elements with the same value. So in 'keydown' and 'keyup' events will be some logic implemented to push the pressed key only once.
+const shipObj = {}; // this object properties and values will describe ship position, rotation angle, and one boolean flag fariable will toggle cyan frame(it is for educational purpose).
+//*************************** events ********************************
+document.addEventListener("keydown",e=>{ // very simple, this event is fired when some key is pressed.
+    if(!pressedKeys.includes(e.key)) pressedKeys.push(e.key); // push the key in array only if there is no such key alreade present(cut off repeating the same key multiple times).
+});
+document.addEventListener("keyup",e=>{ // fired when key is released.
+    pressedKeys.splice(pressedKeys.indexOf(e.key),1); // remove released key for the array. 
+});
+document.addEventListener("click",()=>{ // mouse click will toggle flag variable to show or hide the cyan 'frame' around ship. 
+    shipObj.showFrame = !shipObj.showFrame;
+});
+//*************************** logic *********************************
+function updateShip(){ // called from within animation loop.
+    const accelerationPerFrame = .04; // if the 'ArrowUp' or 'ArrowDown' is pressed ship whill picks up speed or slows down smoothly.
+    const radianPerFrame = .05; // rotation speed in radians per frame. 
+    const maxVelocity = 2; // speed limin in pixels per frame.
+    const switchObj ={ // instead of traditional 'switch' statement I use object literal. It perform the same function, but I like this technique. Google 'javascript object instead of switch' for further info.  
+        "ArrowUp": ()=>{
+            shipObj.vel += accelerationPerFrame; // velocity is incresed every frame if 'ArrowUp' is held.
+            shipObj.vel = shipObj.vel > maxVelocity ? maxVelocity : shipObj.vel; // ternary operator enforce speed limit.
+        },
+        "ArrowDown": ()=>{ // the same logic when slowing down.
+            shipObj.vel -= accelerationPerFrame;
+            shipObj.vel = shipObj.vel < 0 ? 0 : shipObj.vel;
+        },
+        "ArrowLeft": ()=>{ // rotation counterclockwise.
+            shipObj.rotAng -= radianPerFrame;
+        },
+        "ArrowRight": ()=>{ // you alredy know, clockwise.
+            shipObj.rotAng += radianPerFrame;
+        },
+        " ": ()=>{ // pressin space will stop ship immediately.
+            shipObj.vel = 0;
+        },
+        "default": ()=>{}, // any other not listed above key. 
+    }
+    pressedKeys.forEach(k=>{ // loop through each key in array.
+        (switchObj[k] || switchObj["default"])(); // if switchObj[k] is undefined, logical or(||) operator check switchObj["default"] and calls ()=>{}, empty function.
+    });
+    shipObj.x += shipObj.vel*Math.cos(shipObj.rotAng); // velocity and rotation angle define ship movement in the polar coordinate system; we must convert this movement to the Cartesian coordinate system. If you are unfamiliar with the polar system... Understanding polar coordinates is a must to understand algorithms performing such kinds of movement controls.
+    shipObj.y += shipObj.vel*Math.sin(shipObj.rotAng);
+    shipObj.x = shipObj.x < 0 ? canvasElem.width : shipObj.x > canvasElem.width ? 0 : shipObj.x; // ternary operatos perform logic: when ship cross the canvas vertical border, it appears on other side.
+    shipObj.y = shipObj.y < 0 ? canvasElem.height : shipObj.y > canvasElem.height ? 0 : shipObj.y; // the same top and bottom.
+}
+function animate(){ // animation loop. 
+    ctx.clearRect(0,0,canvasElem.width,canvasElem.height); // eraze everything on cavas.
+    updateShip(); // this func check controls, and update ship position, speed, rotation angle.
+    ctx.save(); // I will quote MDN (can't say it better) "save() method of the Canvas 2D API saves the entire state of the canvas by pushing the current state onto a stack". Coupled with ctx.restore() it encapsulate 
+    ctx.translate(shipObj.x,shipObj.y); // remaps the (0,0) position of the context to the ships coordinates.
+    ctx.rotate(shipObj.rotAng); // rotate the context, this will affect drawing.
+    ctx.drawImage(imgShipElem,0,0,224,154,-56,-36,112,72); // Clip the image and position the clipped part on the canvas. w3schools.com have excellent info on this method.
+    if(shipObj.showFrame){ // if flag is true, draw cyan frame.
+        ctx.beginPath();
+        ctx.strokeStyle = "cyan";
+        ctx.fillStyle = "cyan";
+        ctx.arc(0,0,3,0,2*Math.PI);
+        ctx.fill();
+        ctx.moveTo(-56,-36); ctx.lineTo(56,36); 
+        ctx.moveTo(-56,36); ctx.lineTo(56,-36);ctx.stroke();
+        ctx.strokeRect(-56,-36,112,72);
+    }
+    ctx.restore(); //  restores the most recently saved canvas state.
+    requestAnimationFrame(animate); // the browser calls callback function (animate function) with a frequency of the monitor refresh rate. Frequency can drop down if the code within is performance heavy(not our case). 
+}
+//*************************** start here ****************************
+onload = ()=>{ // event is fired when the 
+    canvasElem.width = contElem.offsetWidth; // set canvas width equal to container's width.
+    canvasElem.height = contElem.offsetHeight; // the same for height.
+    shipObj.x = canvasElem.width/2; // place ship in the center horizontaly
+    shipObj.y = canvasElem.height/2; // verticaly.
+    shipObj.rotAng = 0; // rotation angle of the ship.
+    shipObj.vel = 0; // velocity in polar coordinate system
+    shipObj.showFrame = false; // boolean flag to toggle cyan frames around drawen image.
+    animate(); // calls animation loop first time, effectively starts looping animation.
+}
+//*******************************************************************
+        </script>
+    </body>
+</html>
