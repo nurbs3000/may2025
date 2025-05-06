@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Math random and Web Animations API</title>
+        <style> /* internal style. */
+            *{ /* universal selector. Selects all elements. */
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box; /* include the padding and border in an element's total width and height. */
+            }
+            #container{ /* JS will put divs (colored bands) inside. */
+                width: 100vw; /* 100% of the viewport's width. */
+                height: 100vh; /* 100% of the viewport's height. */
+                background-color: #202; /* your choice of color. */
+                display: flex; /* to organize divs created by JS. */
+                align-items: flex-end; /* items positioned at the bottom. */
+                column-gap: 2px; /* gap between divs(colored bands). */
+            }
+        </style>
+    </head>
+    <body>
+        <div id="container"></div> <!-- contain all divs created be JS. -->
+        <script> // embedded JavaScript.
+//*************************** global variables **********************
+const containerElem = document.querySelector("#container"); // for convenience, to save time typing.
+const W = containerElem.offsetWidth; // width of the container.
+const H = containerElem.offsetHeight; // height of the container.
+const NUMBER_OF_BANDS = 40; // number of divs to create.
+const GAP = 2; // gap between divs.
+let growDuration = 500; // duration of animation. Can be dynamically changed by rotating the mouse will.
+//*************************** events ********************************
+document.addEventListener("wheel",e=>{ // the mouse wheel will fire this event.
+    growDuration += e.deltaY; // duration of animation changed by the mouse wheel.
+    growDuration = Math.min(Math.max(growDuration,100),3000); // Clamp animation's duration between 100ms and 3sec.
+});//*************************** logic *********************************
+async function randColor(){ // async function, perform all operations needed to animate single HTML element.
+    const elem = bandElems[Math.floor(Math.random()*NUMBER_OF_BANDS)]; // using array notation picks random div from NodeList collection of created divs, and assign it to const elem.
+    const currentHeight = parseInt(elem.style.height); // get the current element's (random div) height. It is string, thats for parseInf. 
+    const newHeight = currentHeight+10+Math.random()*40; // increas current height by random number in range 10-50.
+    const currentColor = elem.style.backgroundColor; // get current color.
+    const newColor = `hsl(${Math.random()*360},100%,30%)`; // generate random hsl color as new one.
+    const bandGrow = [ // an array of objects (keyframes) consisting of properties and values to iterate over. Consult MDN web docs topic 'Web Animation API' for detailed info.
+        {height: `${currentHeight}px`, backgroundColor: currentColor},
+        {height: `${newHeight}px`, backgroundColor: newColor},
+    ];
+    const bandGrowTiming = { // object of timing properties.
+        duration: growDuration, // animation's durations in ms. This variable dynamically changed within "wheel" event. 
+        fill: "forwards" // retain the style set by the last keyframe.
+    };
+    const animation = elem.animate(bandGrow,bandGrowTiming); // the Element interface's method animate() creates a new Animation, applies it, then plays it. Returns the created Animation object instance.
+    await animation.finished; // read-only property of the Web Animation API returns a Promise which resolves one the animation is finished. Important! We must wait for this promise to be resolved in real time, that's for async/await syntax is implemented. 
+    animation.commitStyles(); // writes the animation's final styles into its target element's style attribute.
+    animation.cancel(); // clear all effects caused by animation and aborts it.
+}
+//*************************** start here ****************************
+for(let i = 0; i < NUMBER_OF_BANDS; i++){ // this for loop creante some bunch of divs, and append them to container. 
+    const elem = document.createElement("div"); // create div element.
+    elem.style.width = `${W/NUMBER_OF_BANDS-GAP}px`; // calculate div's width, taking into account GAP.
+    elem.style.height = "0"; // initial height of the div.
+    elem.style.backgroundColor = "#234" // initial color. Can be any color you want.
+    containerElem.append(elem); // append the created div element inside the conainer.
+}
+const bandElems = document.querySelectorAll("#container>div"); // querySelectorAll method returs
+(function resolver(){ // IIFE (Immediately Invoked Function Expression) will call randColor() repeatedly until program tab in the browser is closed. To understand this logic, knowledge of JS Promises is a must.
+    return randColor()
+        .then(resolver);
+})();
+// Alternative way to start infinite calling of randColor() function.
+// Promise.resolve().then(function resolver(){
+//     return randColor()
+//     .then(resolver);
+// });
+//*******************************************************************
+        </script>
+    </body>
+</html>
