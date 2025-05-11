@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SVG Line Creator</title>
+        <style> /* internal style. */
+            *{ /* universal selector. Selects all elements. */
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box; /* include the padding and border in an element's total width and height. */
+                font: 22px Arial; 
+            }
+            #wrapper{
+                width: 100vw; /* 100% of the viewport's width. */
+                height: 100vh; /* 100% of the viewport's height. */
+                display: flex;
+                flex-direction: column; /* to split viewport horizontaly between header and container. */
+            }
+            header{
+                width: 100%; /* 100% of the parent's width. */
+                height: 120px; /* is ok for 3 rows. */
+                background-color: #222; /* all colors is up to you. */
+                color: green; 
+                display: grid; /* 2d layout to place all buttons, inputs, color and span elements(they serve as labels) inside header. */
+                grid-template-rows: repeat(3,1fr); /* 3 equal rows. */
+                grid-template-columns: 120px 120px 100px 140px 100px 120px 180px; /* columns. */
+                align-items: center;
+                padding: 12px 20px;
+            }
+            [type="button"]{ /* attribute selector - selects 2 buttons. */
+                background-color: #111;
+                color: darkGreen;
+                font-size: 20px;
+                height: 26px;
+            }
+            input[type="number"]{ /* attribute selector - selects all input number elements. */
+                height: 30px;
+                max-width: 80px;
+                background-color: #111;
+                color: darkGreen;
+            }
+            #container{
+                width: 100%; /* 100% of parent's width. */
+                height: 100%; /* 100% of remaining free height.*/
+                background-color: black;
+                position: relative; /* to set children's position to absolute. */
+                display: flex; /* to position children in center by next 2 lines. */
+                justify-content: center;
+                align-items: center;
+                overflow: hidden;
+            }
+            svg{
+                position: absolute; /* must overlap with main element. */
+            }
+            main{
+                background-color: #FFFFFF11; /* some color with transparncy to see svg elements below. */
+                position: absolute; /* must overlap with svg element. */
+            }
+            .point{ /* class selector - selects all divs representing points. */
+                width: 7px;
+                height: 7px;
+                transform: translate(-50%,-50%);
+                border-radius: 50%;
+                background-color: gold;
+                position: absolute;
+            }
+            .point:hover{
+                background-color: orangeRed; /* let it be orange when mouse over. */
+            }
+        </style>
+    </head>
+    <body>
+        <div id="wrapper"> <!-- wrapps everything. -->
+            <header> <!-- hold all control elements. Have a grid layout, and children are positioned by inline style. -->
+                <span id="line" style="grid-area:1/1/2/8;"></span>
+                <span style="grid-area:2/1/3/2;">svg width:</span>
+                <input style="grid-area:2/2/3/3;" type="number" min="30" max="" value="400" autocomplete="off" id="svg-width">
+                <span style="grid-area:3/1/4/2;">svg height:</span>
+                <input style="grid-area:3/2/4/3;" type="number" min="30" max="" value="400" autocomplete="off" id="svg-height">
+                <span style="grid-area:2/3/3/3;">x: <span id="coord-x"></span></span>
+                <span style="grid-area:3/3/4/4;">y: <span id="coord-y"></span></span>
+                <span style="grid-area:2/4/2/5;">stroke:</span>
+                <span style="grid-area:3/4/4/5;">stroke-width:</span>
+                <input style="grid-area:2/5/3/6;width:80px;" type="color" id="stroke" value="#118811" autocomplete="off">
+                <input style="grid-area:3/5/4/6;" type="number" min="1" max="6" value="3" autocomplete="off" id="stroke-width">
+                <button style="grid-area:2/6/3/7;" type="button" id="del">Delete</button>
+                <button style="grid-area:3/6/3/7;" type="button" id="copy">Copy to c.b.</button>
+            </header>
+            <div id="container"> <!-- styled to place 2 children in center. Since they both have position: absolute and the same size(set by JS) they will 100% overlap. -->
+                <svg></svg> <!-- created line elements will be appended inside. -->
+                <main></main> <!-- serve as a container for draggable divs representing points. -->
+            </div>
+        </div>
+        <script>
+//*************************** global variables ********************
+const headerElem = document.querySelector("header"); // and next 6 lines of code for convinience and less typing.
+const firstRowElem = document.querySelector("#line");
+const containerElem = document.querySelector("#container");
+const mainElem = document.querySelector("main");
+const svgElem = document.querySelector("svg");
+const wElem = document.querySelector("#svg-width");
+const hElem = document.querySelector("#svg-height");
+let tempX, tempY; // will hold mouse coordinas when drag and drop operation starts.
+let tempLeft,tempTop; // will hold initial div(point) coordinates for element to drag.
+let draggedElem = undefined; // when drag and drop operation starts, will hold dragged element.
+//*************************** events ********************************
+headerElem.addEventListener("input",e=>{ 
+    if(["svg-width","svg-height"].includes(e.target.id)) setSizes(); // if event was fired by input element chanding size, envoke respective function.
+});
+document.addEventListener("mousemove",e=>{ // perform 2 operations: display local(relative to main and svg elements) coordinates, and if drag operation is active - move point and update svg element.
+    const [x,y] = localCoords(e); // destructuring assignment syntax, set function scope variables x and y to local(relative to svg element top left corner) coordinates. 
+    document.querySelector("#coord-x").textContent = x; // and next code line display x and y coordinates in header.
+    document.querySelector("#coord-y").textContent = y;
+    if(!e.buttons%2) draggedElem = undefined; // e.buttons = 1 when LMB is pressed. So this way check is performed if LMB is not pressed then set draggedElem variable to undefined(no drag operation is active).
+    if(!draggedElem || x === "") return; // if no object to drag(move) or if x === "" meaning mouse cursor is ouside svg element - return;
+    draggedElem.style.left = tempLeft+(x-tempX)+"px"; // set dragged element horizonal coordinate.
+    draggedElem.style.top = tempTop+(y-tempY)+"px"; // ... vertical coordinate.
+    const lineElems = svgElem.querySelectorAll("line"); // selector all svg lines.
+    if(!lineElems.length || lineElems.length == draggedElem.dataset.lineIdx) return; // if there is svg line elemens present or we are dragging the first point of yet unfinished svg line - return.
+    // if we get so far - means we must update svg line element, depending on which (first or second point is dragged).
+    const lineElem = lineElems[parseInt(draggedElem.dataset.lineIdx)]; // assign function scope constant lineElem to svg line element according to dragged point line index.
+    if(draggedElem.classList.contains("first")){ // if dragged 1st point.
+        lineElem.setAttribute("x1",parseInt(draggedElem.style.left));
+        lineElem.setAttribute("y1",parseInt(draggedElem.style.top));
+    }
+    if(draggedElem.classList.contains("second")){ // if dragged 2nd point.
+        lineElem.setAttribute("x2",parseInt(draggedElem.style.left));
+        lineElem.setAttribute("y2",parseInt(draggedElem.style.top));
+    }
+    firstRowElem.textContent = lineElem.outerHTML; // display text representation of the svg line element.
+});
+mainElem.addEventListener("click",createLine); // if click on main element, envoke createLine function.
+headerElem.addEventListener("click",e=>{ // click on header, where control elements are (inputs, buttons, color).
+    del(e); // call to function delete.
+    copy(e); // call to function copy(to clipboard).
+});
+document.addEventListener("mousedown",e=>{
+    if(!/point/g.test(e.target.className)) return; // if event fired by an element not containing 'point' in className - return. We can drag and drom only div elements representing points.
+    e.preventDefault(); // to turn off default drag and drop performed by browser.
+    draggedElem = e.target; // assign global draggedElem variable to point element which fired the event.
+    [tempX,tempY] = localCoords(e); // destructuring assignment syntax, to set global varirable to mouse local coordinates at the moment the drag operation starts.
+    [tempLeft,tempTop] = [parseInt(e.target.style.left),parseInt(e.target.style.top)]; // destructuring assignment syntax, to set global variables to initial coordinate of point, which is dragged.
+});
+document.addEventListener("mouseup",e=>{
+    draggedElem = undefined; // if LMB is released, dragg operation is over.
+});
+//*************************** logic *********************************
+function createLine(e){ // create points and of it is the second point create line element too.
+    if(e.target.tagName !== "MAIN") return; // if click ouside main element - return.
+    disableInputWH(true); // we are creating point(div) element. It is time to disable input svg width and height elements.
+    const [x,y] = localCoords(e); // destructoring asignment syntax. Assign x,y variables to relative svg element coordinates of the mouse.
+    let x1,y1; // declare x1,y1 variables. They will get values if it will be second point.
+    const idx = mainElem.childElementCount; // point element is not yet appended to main, so it will be its index (0 for the 1st one, 1 for 2nd, and so on).
+    const elem = document.createElement("div"); // create div element(draggable 'gold' point).
+    elem.className = idx%2 ? "second point" : "first point"; // check if the number of existing points (divs) is odd or even, to determine wheter it will be second or first point for constructing line element.
+    if(idx%2) [x1,y1] = [parseInt(mainElem.lastChild.style.left),parseInt(mainElem.lastChild.style.top)]; // destructoring assignment syntac, to set second point coordinates(declared earlier), if it is second point.
+    elem.style.left = x+"px"; // set inline style to place point(div) horizontaly.
+    elem.style.top = y+"px"; // ... verticaly.
+    elem.dataset.idx = idx; // set custom data attribute to save point index.
+    elem.dataset.lineIdx = Math.floor(idx/2); // set custom data attribute to save line index(every 2 points determine a svg line element).
+    mainElem.append(elem); // all ready, append point(div) to main element.
+    if(elem.className === "first point") return; // not yet ready to create svg line element (second point required too).
+    createSVGLine(x1,y1,x,y); // call function to create svg line element.
+}
+function createSVGLine(x1,y1,x2,y2){ // as arguments receives first and second line point's coordinates.
+    const lineElem = document.createElementNS("http://www.w3.org/2000/svg","line"); // create element with namespace (required for svg elements).
+    lineElem.setAttribute("x1",x1); // and next codes lines set required attributes for line element.
+    lineElem.setAttribute("y1",y1);
+    lineElem.setAttribute("x2",x2);
+    lineElem.setAttribute("y2",y2);
+    lineElem.setAttribute("stroke",document.querySelector("#stroke").value);
+    const wValue = document.querySelector("#stroke-width").value;
+    lineElem.setAttribute("stroke-width",wValue);
+    svgElem.appendChild(lineElem); // when line element is done, appent it to svg.
+    firstRowElem.textContent = lineElem.outerHTML; // display svg line.
+}
+function setSizes(){
+    if(wElem.max === ""){ // if max value is empty string, sets max input elements value to container element's width and height respectively.
+        wElem.max = (containerElem.offsetWidth).toString();
+        hElem.max = (containerElem.offsetHeight).toString();
+    }
+    let [w,h] = [Number(wElem.value),Number(hElem.value)]; // destructuring asignment syntax. It's great for less typing and concise code.
+    if(w >= Number(wElem.max)) wElem.value = wElem.max; // if the inputed width is more or equal to the maxium allowed, set it to max.
+    if(h >= Number(hElem.max)) hElem.value = hElem.max; // the same for height.
+    [mainElem.style.width,mainElem.style.height] = [w+"px",h+"px"]; // destructuring asignment syntax. Set width and height of main element.
+    svgElem.setAttribute("width",w); // svg elemen width and height will be the same.
+    svgElem.setAttribute("height",h);
+}
+function del(e){ // delete point. If it is secont point, delete respective line element inside svg too.
+    if(!mainElem.childElementCount || e.target.id !== "del") return; // if there is no children inside main, or if somehow function is called not by delete button click event - return.
+    if(mainElem.lastChild.classList.contains("first")){ // if last present div(point) is first. Must delete only poin(svg line in not yet contstructed for this point.
+        mainElem.lastChild.remove();
+        if(!mainElem.lastChild) disableInputWH(false); // if now there is not chilred in main element(no points left) enable input elements.
+        return;
+    } 
+    mainElem.lastChild.remove(); // we are here if it is second point.
+    svgElem.lastChild.remove(); // must remove svg line too.
+    if(!mainElem.lastChild) disableInputWH(false); // if there is no points(divs) in main element, enable input elements. 
+}
+function copy(e){ // copy SVG element and all its children(lines) text representation to clipboard. You can 'paste' them to place where need be.
+    if(!svgElem.lastChild || e.target.id !== "copy") return;
+    navigator.clipboard.writeText(svgElem.outerHTML);
+}
+function localCoords(e){ // will return mouse pointer coordinates relative to the main element top left corner. If mouse outside main element(svg element have exactly the same size and position as main element) set x and y coordinates to empty strings.
+    let [x,y] = [e.clientX-mainElem.offsetLeft, e.clientY-mainElem.offsetTop-headerElem.offsetHeight]; // destructuring assignment syntax. Set mouse coordinates relative to main element top left corner(main element position and size are the same as svg element position and size. Not possible to use layerX and layerY, because when dragged operation perforemed this will be coordinates within small div representing point.
+    if(x < 0 || x > parseInt(mainElem.style.width) || y < 0 || y > parseInt(mainElem.style.height)) [x,y] = ["",""]; // if mouse is outside svg element, set x and y to "".
+    return [x,y]; // return an array with mouse local coordinates(or ["",""] if mouse is outside of svg element).
+}
+function disableInputWH(flag){ // set or remove disabled attribute for 2 input SVG width and height elements.
+    if(flag){
+        wElem.setAttribute("disabled",flag);
+        hElem.setAttribute("disabled",flag);
+    }else{
+        wElem.removeAttribute("disabled");
+        hElem.removeAttribute("disabled");
+    }
+}
+//*************************** start here ****************************
+setSizes(); // call function to set size of svg element.
+//*******************************************************************
+        </script>
+    </body>
+</html>
