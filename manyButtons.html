@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Many Buttons and One Event Listener</title>
+        <style> /* inline style. */
+            *{ /* universal selector. Selects all elements. */
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box; /* include the padding and border in an element's total width and height. */
+                font: 16px Arial;
+                font-weight: bold;
+            }
+            #wrapper{
+                width: 100vw; /* 100% of the viewport's width. */
+                height: 100vh; /* 100% of the viewport's height. */
+                display: flex; /* to organize 2 aside divs on left and right, and main element in the middle. */
+            }
+            .aside{ /* class selector. Selects both aside divs. */
+                width: 20%; /* 20% of the parents width. */
+                height: 100%; /* 100% of the parents height. */
+                background-color: rgb(48, 48, 113); /* all colors are up to you. */
+                display: flex; /* and next 2 lines, will organize buttons in vertical order. */
+                flex-direction: column;
+                align-items: center;
+            }
+            main{
+                width: 60%; /* 60% of the parent's width. */
+                height: 100%;  /* 100% of the parent's height. */
+                background-color: rgb(114, 114, 161);
+                position: relative; /* to enable position: abolute for its child element - the div 'square'. */
+            }
+            button{ 
+                margin: 6vh 2vw; /* some design for buttons, it is all optional. */
+                width: 110px;
+                height: 25px;
+                color: navy;
+            }
+            #square{ /* id selector. */
+                width: 100px; /* this CSS property and all listed below, to give it some discent appearence. */
+                height: 100px;
+                background-color: orangeRed;
+                color: navajoWhite;
+                font-size: 70px;
+                border: 6px solid maroon;
+                text-align: center;
+                line-height: 90px;
+                position: absolute; /* required for inline style.left and style.top CSS properties to work. */
+            }
+        </style>
+    </head>
+    <body>
+        <div id="wrapper"> <!-- wrapps  everything. -->
+            <div class="aside"> <!-- div on the left, 6 buttons insede. -->
+                <button type="button" id="move_up">Move Up</button>
+                <button type="button" id="move_down">Move Down</button>
+                <button type="button" id="move_left">Move Left</button>
+                <button type="button" id="move_right">Move Right</button>
+                <button type="button" id="incr_counter">Increase</button>
+                <button type="button" id="reset_counter">Reset</button>
+            </div>
+            <main> <!-- container for the 'squre'. -->
+                <div id="square">5</div> <!-- buttons will affect this element, changing its position, scale, color, and rotation angle. -->
+            </main>
+            <div class="aside"> <!-- dif on the right, 6 buttons inside. -->
+                <button type="button" id="grow">Grow</button>
+                <button type="button" id="shrink">Shrink</button>
+                <button type="button" id="rotate_cw">Rotate CW</button>
+                <button type="button" id="rotate_ccw">Rotate CCW</button>
+                <button type="button" id="random_color">Rand Color</button>
+                <button type="button" id="random_border">Rand Border</button>
+            </div>
+        </div>
+        <script>
+//*************************** global variables **********************
+const mainElem = document.querySelector("main");
+const squareElem = document.querySelector("#square");
+let counter = 0; // arbitrary variable, displayed inside the 'square' div.
+let scale = 1, rotAngle = 0; // the initial 'square' divs scale and rotation angle.
+//*************************** events ********************************
+document.addEventListener("click",buttonsListener); // this one listener will handle all present button. 
+//*************************** logic *********************************
+function buttonsListener(e){ // Accept as an argument a mouse event object. Mouse event object property target. id is the ID of the element that fires the event. This 'feature' enables the possibility for one event listener to handle many buttons(in theory, any number).
+    const moveDist = 20; // ditance in pixels to move 'square' top, down, left, and righth.
+    const switchObj = { // switch object literal. Object values are functions. I prefer it, insted of switch statement. If you are unfamiliar with it, goole 'replace switch statement with object literal'. 
+        move_up: ()=>{
+            squareElem.style.top = parseInt(squareElem.style.top)-moveDist+"px";
+        },
+        move_down: ()=>{
+            squareElem.style.top = parseInt(squareElem.style.top)+moveDist+"px";
+        },
+        move_left: ()=>{
+            squareElem.style.left = parseInt(squareElem.style.left)-moveDist+"px";
+        },
+        move_right: ()=>{
+            squareElem.style.left = parseInt(squareElem.style.left)+moveDist+"px";
+        },
+        incr_counter: ()=>{
+            squareElem.textContent = ++counter;
+        },
+        reset_counter: ()=>{
+            counter = 0;
+            squareElem.textContent = counter;
+        },
+        grow: ()=>{
+            scale += .1;
+            squareElem.style.transform = `scale(${scale}) rotate(${rotAngle}deg)`;
+        },
+        shrink: ()=>{
+            scale -= .1;
+            squareElem.style.transform = `scale(${scale}) rotate(${rotAngle}deg)`;
+        },
+        rotate_cw: ()=>{
+            rotAngle += 5;
+            squareElem.style.transform = `scale(${scale}) rotate(${rotAngle}deg)`;
+        },
+        rotate_ccw: ()=>{
+            rotAngle -= 5;
+            squareElem.style.transform = `scale(${scale}) rotate(${rotAngle}deg)`;
+        },
+        random_color: ()=>{
+            squareElem.style.backgroundColor = `hsl(${Math.random()*360},100%,40%)`;
+        },
+        random_border: ()=>{
+            squareElem.style.border = `6px solid hsl(${Math.random()*360},100%,40%)`;
+        },
+        default: ()=>{console.log("Smth happened.");},
+    };
+    (switchObj[e.target.id] || switchObj["default"])(); // The trick is that button IDs are the strings, which are exactly the same as object literal property names. This way code can be very concise. Logical OR(||) operator calls the 'default' function if switchObj[e.target.id] is undefined, meaning the button's id is not listed in the property names.
+}
+//*************************** start here ****************************
+squareElem.style.left = mainElem.offsetWidth/2-50+"px"; // set the initial 'square' horizontal position in the middle of the main element (-50 because the square's size is 100px).
+squareElem.style.top = mainElem.offsetHeight/2-50+"px"; // the same for vertical position.
+squareElem.textContent = counter; // display initial counter value (0) inside the 'square'.
+//*******************************************************************
+        </script>
+    </body>
+</html>
