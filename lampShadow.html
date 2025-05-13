@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf=8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>CSS Box Shadow from Lamp</title>
+        <style>
+            *{ /* internal CSS style. */
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box; /* include the padding and border in an element's total width and height. */
+                font: 20px Arial;
+            }
+            #wrapper{
+                width: 100vw; /* 100% of the viewport's width. */
+                height: 100vh; /* 100% of the viewport's height. */
+                display: flex; /* to organize aside and main elements, splitting viewport between them vertically. */
+                overflow: hidden;
+            }
+            aside{
+                width: 100px; /* enough space for control elements. */
+                height: 100%; /* 100% of the parent's height. */
+                background-color: teal; /* all colors are up to you. */
+                color: beige;
+                display: flex; /* and next 3 lines organize control elements inside aside vertically. */
+                flex-direction: column;
+                align-items: center;
+                justify-content: space-evenly;
+            }
+            main{
+                width: 100%; /* 100% of remaining free width (100vw - 100px). */
+                height: 100%; /* 100% of the parent's height. */
+                background-color: snow;
+                position: relative; /* to set CSS property position of its child 'plate' to absolute. */
+            }
+            #plate{
+                background-color: darkSlateGray;
+                position: absolute; /* required for inline style.left and style.tot CSS properties to work. */
+            }
+            span{
+                text-align: center; /* center text horizontaly. */
+            }
+            #lamp{
+                width: 54px; /* to fit 40px font-size. */
+                height: 54px; /* the same. */
+                transform: translate(-50%,-50%); /* center it relative to its top and left position. */
+                font-size:40px;
+                position: absolute; /* requird for inline style.left and top to work. */
+                cursor: grab; /* visual feedback to signify, that it can be dragged. */
+                overflow: hidden;
+            }
+            #lamp.dragging{ /* JS will set class="dragging", when element will be dragged. */
+                cursor: grabbing;
+            }
+            #info{ /* this elemen will hold constructed CSS box-shadow. */ 
+                position: absolute;
+                font-size: 28px;
+                font-weight: bold;
+                color: darkSlateGray;
+                margin: 10px 20px;
+            }
+            </style>
+    </head>
+    <body>
+        <div id="wrapper"> <!-- wrapps everything. -->
+            <aside> <!-- hold control elements, to manipulate the 'lamp' -->
+                <span>Lamp<br>height</span>
+                <input type="range" id="lamp-height" min="2" max="100" value="30" autocomplete="off" style="transform:rotate(-90deg);width:150px;">
+                <span>Lamp<br>size</span>
+                <input type="range" id="lamp-size" min="0" max="20" value="4" autocomplete="off" style="transform:rotate(-90deg);width:150px;">
+                <span>Shadow<br>color</span>
+                <input type="color" id="shadow-color" value="#222222" autocomplete="off">
+            </aside>
+            <main>
+                <span id="info"></span> <!-- JS will set textContent. -->
+                <div id="plate" style="width:100px;height:100px;"></div> <!-- the main character, will cast box-shadow depending on 'lamp' positioin. -->
+                <span id="lamp">🌞</span> <!-- will play the role of light sourse, to calculate the box-shadow. -->
+            </main>
+        </div>
+        <script>
+//*************************** global variables **********************
+const asideElem = document.querySelector("aside");
+const mainElem = document.querySelector("main");
+const lampElem = document.querySelector("#lamp");
+const plateElem = document.querySelector("#plate");
+const dragAndDrop = (()=>{ // IIFE (Immediately Invoked Function Expression will return closure, which will have access to 5 variables, declared below. This closure function is the callback function for all mouse events (mousemove, mousedown, and mouseup) which control drag and drop logic.
+    let initialTop, initialLeft; // will hold the initial(the moment the 'mousedown' event fires) 'lamp' coodinates.
+    let initialX, initialY; // will hold the initial mouse cursor coordinates.
+    let dragging; // flag variable(true or false). Signifies if drag and drop operation is going on or not.
+    return (e)=>{ // this is the inner function which is returned as clusure, when EFFI executes.
+        e.preventDefault(); // event 'mousedown' must not be explicitly handled(default browser drag and drop). JS will do this job.   
+        if(e.type === "mousedown"){ // check if the event was fired by the 'mousedown'.
+            [initialLeft,initialTop] = [parseInt(lampElem.style.left),parseInt(lampElem.style.top)]; // desctructuring assignment syntax. All 3 events('mousemove','mousedown', and 'mouseup' will have access to this variables, because this closure is created immediately at the start by IFEE function.
+            [initialX,initialY] = mainXY(e); // mainXY() returns array containin local(ralative to main element's' top left corner coordiantes of mouse cursor.
+            dragging = true; // booleand flag.
+            lampElem.classList.add("dragging"); // set class name, for CSS style to change cursor.
+            return; 
+        }
+        if(e.type === "mousemove"){ // check if it is "mousemove" event.
+            if(!e.buttons%2) dragging = false; // if LMB is not pressed, drag-and-drom operation is not active.
+            if(!dragging) return; // if drag-and-drop is not going on, means nothing to do.
+            const [x,y] = mainXY(e); // destructoring assignment syntax.
+            const [dx,dy] = [x-initialX,y-initialY]; // calculate the difference between current and initial(when drag starts) mouse coordinates.
+            lampElem.style.left = initialLeft+dx+"px"; // update the horizontal 'lamp' position.
+            lampElem.style.top = initialTop+dy+"px"; // update the vertical 'lamp' position.
+            shadow(); // calls the functio to update box-shadow according to new 'lamp' position.
+            return;
+        }
+        if(e.type === "mouseup"){ // check if it is 'mouseup' event. This event ends drag-and-drop action.
+            dragging = false; // boolean flag.
+            lampElem.classList.remove("dragging"); // class name for CSS to change cursor.
+            return;
+        }
+    }
+})();
+//*************************** event *********************************
+mainElem.addEventListener("mousemove",dragAndDrop); // and next 2 mouse events hava as a callback function a closure that was initialized by IFFE function.
+mainElem.addEventListener("mousedown",dragAndDrop);
+mainElem.addEventListener("mouseup",dragAndDrop);
+asideElem.addEventListener("input",shadow); // any change of the 'lamp's height, width and shadow color must update the box-shadow.
+//*************************** logic *********************************
+function mainXY(e){ // calculate local(relative to main elmenet's top left corner mouse coordinates.
+    const rect = mainElem.getBoundingClientRect(); // returns object providing size and position of mainElem.
+    return [e.clientX-rect.left,e.clientY-rect.top]; // returns array with local x and y mouse coordinates.
+}
+function shadow(){ // construct box-shadow.
+    const lampHeight = parseInt(document.querySelector("#lamp-height").value); // get the 'lamp' height. 
+    const lampSize = parseInt(document.querySelector("#lamp-size").value); // get the 'lamp' size. Bigger the 'lamp' means more shadow blur.
+    const [lX,lY] = [parseInt(lampElem.style.left),parseInt(lampElem.style.top)]; // get the 'lamp' coordinates, converting them from string type to number.
+    let {left,top,width,height} = plateElem.style; // destructoring assignmenet syntax.
+    [left,top,width,height] = [left,top,width,height].map(v=>parseInt(v)); // map from string type to number.
+    const [cX,cY] = [left+width/2,top+height/2]; // calculate and assign the coordinates of the 'plate' element center(they are required to define on what side of the 'plate' the shadows fall.
+    const hOffset = Math.floor((cX-lX)*(2/lampHeight)); // calculate horizonal offset for box-shadow. 
+    const vOffset = Math.floor((cY-lY)*(2/lampHeight)); // vertical offset for box-shadow.
+    const color = document.querySelector("#shadow-color").value; // get the shadow color from input type="color" element.
+    const blur = lampSize; // shadow blur is directly the lamp's size.
+    const value = `${hOffset}px ${vOffset}px ${blur}px ${color}`; // construct the box-shadow value.
+    document.querySelector("#info").textContent = "box-shasow: "+value; // display this value as text at the top.
+    Object.assign(plateElem.style,{boxShadow:`${hOffset}px ${vOffset}px ${blur}px ${color}`}); // set inline box-shadow property. The trick here is that plateElem.style is an object, so Object.assign() method allows to merge the new property box-shadow with existing properties left and top without erazing them.
+}
+//*************************** start here ****************************
+lampElem.style = `left:${mainElem.offsetWidth/4}px;top:${mainElem.offsetHeight/4}px`; // set the initial 'lamp' position.
+plateElem.style = `width:200px;height:200px;left:${mainElem.offsetWidth/2-100}px;top:${mainElem.offsetHeight/2-100}px`; // set the initial 'plate' element position right in the center.
+shadow(); // display shadow not waiting for any event.
+//*******************************************************************
+        </script>
+    </body>
+</html>
