@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Game of Tag</title>
+        <style> /* internal CSS style. */
+            *{ /* universal selector. Selects all elements. */
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box; /* include the padding and border in an element's total width and height. */
+                font-family: Arial; /* or whatever shrift you like. */
+                font-size: 3.5vh;
+            }
+            #wrapper{
+                width: 100vw; /* 100% of the viewport's width. */
+                height: 100vh; /* 100% of the viewport's height. */
+                background-color: #222; /* all color choices are yours. */
+                display: flex;
+                flex-direction: column; /* and next 2 lines, organize header,main, and footer element. */
+                align-items: center;
+                justify-content: center;
+                gap: 1vh; /* why not? */
+            }
+            header,footer{ /* they both styled at once. */
+                width: 60vh;
+                height: 7vh;
+                background-color: sandyBrown;
+                display: flex; /* and next 2 line organize items inside. */
+                justify-content: space-evenly;
+                align-items: center;
+            }
+            main{
+                width: 60vh; /* 60% of the viewport's height. */
+                height: 60vh; /* 60% of the viewport's HEIGHT. It will be square. */
+                background-color: #444;
+                position: relative; /* to enable absolute position for 'chips'. */
+            }
+            .chip{ /* class selector. Selects all created by JS divs. */
+                background-color: steelBlue;
+                color: wheat;
+                border: 1vh solid navy;
+                border-radius: 2vh;
+                box-shadow: 5px 5px 2px #222;
+                scale: .92;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                font-weight: bold;
+                font-size: 7vh;
+                position: absolute;
+                transition: left .3s, top .3s; /* change listed properties smoothly over a given duration. */
+            }
+            button{ /* it is a button :) */
+                height: 6vh;
+                width: 16vh;
+                background-color: chocolate;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="wrapper"> <!-- as the name suggest, wrapps everything. -->
+            <header></header> <!-- semantic HTML element. Can be div instead, with id or class for eash selection. -->
+            <main></main> <!-- also semantic element. Holds 15 created div's(representin game chips) created by JS. -->
+            <footer> <!-- anonthe semantic element. Shuffle button inside. -->
+                <button type="button" id="btn-shuffle">Shuffle</button>
+            </footer>
+        </div>
+        <script> // embedded JS.
+//*************************** global variables **********************
+const headerElem = document.querySelector("header");
+const mainElem = document.querySelector("main");
+let emptySpot = {c:3, r:3}; // this object properties are empty spot columns and row coordinates.
+const MOVE_TIME_MS = 300; // time in milliseconds each more takes.
+let chipSize; // chip's (div representing chip) widht and height.
+//*************************** events ********************************
+document.addEventListener("keydown",throttledMove());
+document.querySelector("#btn-shuffle").addEventListener("click",shuffle);
+//*************************** logic *********************************
+function initChips(){ // initialize (populate main with divs) chips.
+    mainElem.innerHTML = ""; // erase everything inside main element.
+    chipSize = mainElem.getBoundingClientRect().width/4; // set chipSize. 
+    for(let i = 0; i < 15; i++){ // you know what it is.
+        const elem = document.createElement("div"); // create div element.
+        elem.style = `width:${chipSize}px;height:${chipSize}px;`; // style attribute.
+        elem.style.top = `${chipSize*Math.floor(i/4)}px`; // calculate vertical coordinate converting index(0-15) into row(0-3).
+        elem.style.left = `${chipSize*(i%4)}px`; // calculate horizontal coordinate converting index(0-15) into column(0-3).
+        elem.classList.add("chip"); // add a class 'chip'.
+        elem.textContent = i+1; // numbers on chips start from 1 not from 0.
+        elem.setAttribute("data-cr",`c${i%4}r${Math.floor(i/4)}`); // this custon date attribute will contain colum(after letter 'c') and row(after letter 'r') coordinates for chip(div) element.
+        mainElem.appendChild(elem); // when all set, append it to main.
+    }
+}
+function throttledMove(){ // Returns a closure function.
+    let timerId; // returned closure function will have access to this variable.
+    return (e)=>{
+        if(!timerId){ // if (timerId === undefined)
+            move(e); // perform chip move specified by pressed key.
+            timerId = setTimeout(()=>{ // set the timer to set the 'timerId' to undefined(allow move to be executed again)
+                timerId = undefined;
+            }, MOVE_TIME_MS);
+        }
+    }
+}
+function move(e){
+    const switchMove = { // object literal to replace switch statement. If this is new to you. Google 'Replacing switch statements with Object literals'.
+        "ArrowDown": ()=>{if(emptySpot.r !== 0) moveChip(0,-1);},// if emptySpot is not in top row, then move chip above empty spot down.
+        "ArrowUp": ()=>{if(emptySpot.r !== 3) moveChip(0,1);}, // if emptySpot is not in bottom row, then move chip below empty spot up.
+        "ArrowRight": ()=>{if(emptySpot.c !== 0) moveChip(-1,0);}, // if emptySpot is not in left column, then move chip on the left(from emptySpot) to the right;
+        "ArrowLeft": ()=>{if(emptySpot.c !== 3) moveChip(1,0);}, // the same logic.
+        "otherKey": ()=>{}, // do nothing if pressed key is not arrow key.
+    };
+    (switchMove[e.key] || switchMove["otherKey"])(); // switchMove object literal properties are strings that are the same as the strings which represents pressed keys. Logical or calls "otherKey" function if e.key(e is mouse event object passed from mouse event) property does not exist in object.
+    e.callFromShuffle || winCheck(); // logical OR(||) operator perform logic if(e.callFromShuffle === false) winCheck();
+    function moveChip(dirColumn,dirRow){ // move chip in direction specified by 2 parameters. 
+        const [chipColumn,chipRow] = [emptySpot.c+dirColumn,emptySpot.r+dirRow]; // destructuring asignment syntax. Declare and assign 2 variables chipColumn and chipRow to the column and row on left,right, top or left from the emptySpot.  
+        const elem = document.querySelector(`[data-cr="c${chipColumn}r${chipRow}"]`); // Custom data property is a string. Inside that string arter letters c and r are the numbers corresponding to the current chip column and row position.
+        elem.style.left = `${emptySpot.c*chipSize}px`; // set new position of the selected chip element.
+        elem.style.top = `${emptySpot.r*chipSize}px`;
+        elem.setAttribute("data-cr",`c${emptySpot.c}r${emptySpot.r}`); // set its custom data property to be in sync with its new position(it moves to the emptySpot position).
+        emptySpot = {c:chipColumn,r:chipRow}; // assign new empty spot positioin(a chip and emptySpot are swapping their positions).
+    }
+}
+function shuffle(){ // shuffle the chips inside main element.
+    const MOVES_QT = 100; // number of moves in the shuffle
+    let i = MOVES_QT; // counter to display in header element.
+    let intervalId = setInterval(()=>{ // calls a callback function at specified intervals (in ms).
+        randomMove(); // perform random move.
+        headerElem.textContent = i--; // display counter.
+    }, MOVE_TIME_MS); // interval is set by global variable 'MOVE_TIME_MS'.
+    setTimeout(()=>{ // calls a callback function after a specified delay in ms.
+        clearInterval(intervalId); // cancels the setInteval().
+        headerElem.textContent = ""; // clears text inside the header element.
+    }, (MOVES_QT+3)*MOVE_TIME_MS); // delay in ms.
+    let lastDirection = ""; // hold last move direction.
+    function  randomMove(){ // perform random chip move. Utilize the 'lastDirection' variable to not move chips back and forth  
+        let direction;
+        while(true){ // will not loop endlessly. If 4 "ifs" fail, break statement will end this loop.
+            direction = ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"][Math.floor(Math.random()*4)]; // assing random value from array of strings to direction variable.
+            if(direction === "ArrowUp" && (lastDirection === "ArrowDown" || emptySpot.r === 3)) continue; // terminate current loop iteration and continues with the next iteration (pick up another random direction). If it directiction is opposite to the last one, or emptySpot is in bottom row, meaning it is impossible to move chip up. The same logic for the next 3 'if' statements.
+            if(direction === "ArrowDown" && (lastDirection === "ArrowUp" || emptySpot.r === 0)) continue;
+            if(direction === "ArrowLeft" && (lastDirection === "ArrowRight" || emptySpot.c === 3)) continue;
+            if(direction === "ArrowRight" && (lastDirection === "ArrowLeft" || emptySpot.c === 0)) continue;
+            break; // if all 4 'if' stataments fail, break out of the loop.
+        }
+        move({key:direction, callFromShuffle:true}); // call function to move chip to empty spot, passing as argument object literal with key and callFromShuffle(flag variable to let move function know if the call is from shuffle function or from event keydown) properties.
+        lastDirection = direction; // after move, lastDirection now is direction.
+    };
+}
+function winCheck(){ // check if all chips are in ascending order.
+    const elems = document.querySelectorAll('[data-cr]'); // using attribute selector, selects all chip elements.
+    let i = 0, isWin = true; // set initial index and flag variable.
+    elems.forEach(elem=>{ // loop through each element of elems collection.
+        const r = Math.floor(i/4); // calculate row. While index 'i' goes from 0 to 15, 'r' grom from 0 to 3.
+        const c = i%4; // cycle from 0 to 3 repeatedly.
+        if(elem.dataset.cr !== `c${c}r${r}`) isWin = false; // chech if the custom data attribute is not correct for the current index
+        i++;    // increase index  (because there are 15 elements in collection elems).It will count from 0 to 14.
+    });
+    isWin && (headerElem.textContent = "You win !"); // flag variable isWin true when all chips are in order.
+}
+//*************************** start here ****************************
+initChips(); // initialize chips.
+//*******************************************************************
+        o</script>
+    </body>
+</html>
