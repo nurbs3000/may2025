@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SVG Arc Editor</title>
+        <style> /* internal style. */
+            *{ /* universal selector. Selects all elements. */
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box; /* include the padding and border in an element's total width and height. */
+                font: 20px Arial;
+            }
+            #wrapper{
+                width: 100vw; /* 100% of whe viewport's width. */
+                height: 100vh; /* 100% of the viewport's height. */
+                display: flex; /* and next line, to organize header and container layout. */
+                flex-direction: column;
+            }
+            header{
+                width: 100%; /* 100% of the parent's width. */
+                height: 160px; /* is ok for 6 lines to display SVG element. */
+                background-color: gray; /* all color choises up to you. */
+                color: indigo;
+                padding: 12px 20px;
+            }
+            #container{
+                width: 100%; /* 100% of the parent's width. */
+                height: 100%; /* 100% of the remaining free height. */
+                background-color: gainsboro;
+                position: relative; /* to enable position absolute for all children elements. */
+                overflow: hidden; /* the overflow is clipped. */
+            }
+            svg{
+                position: absolute; /* required to position element using left and top CSS properties. */
+            }
+            .point{ /* class selector to style all 5 draggable(movable) div elements. */
+                width: 25px; /* width adn height set to fit font-size. */
+                height: 25px;
+                font-size: 17px;
+                transform: translate(-50%,-50%); /* center element horizontally and vertically within its container. */
+                position: absolute; /* required to position element using left and top CSS properties. */
+                cursor: grab; /* visual feedback. */
+            }
+        </style>
+    </head>
+    <body>
+        <div id="wrapper"> <!-- wrapps header and container elements. -->
+            <header> <!-- elements inside will serve to display SVG element parameters. JS will dynamically update textContent for span elements to display SVG parameters. -->
+                <span>&lt;svg width="<span id="svg-width"></span>" height="<span id="svg-height"></span>"&gt;</span>
+                <br>
+                <span>&nbsp;&nbsp;&lt;path</span>
+                <br>
+                <span>&nbsp;&nbsp;&nbsp;&nbsp;d="M<span id="start-point"></span>A<span id="radius-x"></span><span id="radius-y"></span><span id="rotation"></span><span id="large-arc-flag"></span><span id="sweep-flag"></span><span id="end-point"></span>"</span> 
+                <br>
+                <span>&nbsp;&nbsp;&nbsp;&nbsp;stroke="#f02020" stroke-width="12" fill="none"</span>
+                <br>
+                <span>&nbsp;&nbsp;&sol;&gt;</span>
+                <br>
+                <span>&lt;&sol;svg&gt;</span>
+            </header>
+            <div id="container"> <!-- contain 4 possible arcs, 2 SVG lines to display ellipse's semi axes, and 5 movable point to edit SVG path(arc) dynamicaly. -->
+                <svg>
+                <path id="arc00" stroke-width="10" fill="none"/> <!-- 4 arcs possible for given 2 points (start and end). -->
+                <path id="arc01" stroke-width="10" fill="none"/>
+                <path id="arc10" stroke-width="10" fill="none"/>
+                <path id="arc11" stroke-width="10" fill="none"/>
+                <line id="semi-minor" style="stroke:dimgray;stroke-width:2"/> <!-- ellipse's semi-major axis, radX. -->
+                <line id="semi-major" style="stroke:dimgray;stroke-width:2"/> <!-- ellipse's semi-minor axis, radY. -->
+                </svg>
+                <div class="point start">🔵</div> <!-- 5 draggable divs, containing emojis, to modify the SVG path arc. -->
+                <div class="point end">🔵</div>
+                <div class="point rad-x">🔛</div>
+                <div class="point rad-y">🔛</div>
+                <div class="point rot">🔄</div>
+            </div>
+        </div>
+        <script>
+//*************************** global variable ***********************
+const headerElem = document.querySelector("header");
+const contElem = document.querySelector("#container")
+const svgElem = document.querySelector("svg");
+const startPointElem = document.querySelector(".point.start");
+const endPointElem = document.querySelector(".point.end");
+const semiMajorElem = document.querySelector("#semi-major");
+const semiMinorElem = document.querySelector("#semi-minor");
+const radXPointElem = document.querySelector(".point.rad-x");
+const radYPointElem = document.querySelector(".point.rad-y");
+const rotPointElem = document.querySelector(".point.rot");
+const π = Math.PI; // alt code 227 (hold Alt key and press 227).
+let xc, yc; // coordinates of ellipse's center. Will by calculated, using some math.
+let initialX, initialY; // initial (at the start of drag and drop operation) coordinates of mouse curson inside container.
+let initialLeft, initialTop; // initial (when drag and drom begins) coordinates of dragged element.
+let initialRadX, initialRadY, initialRot; // initial ellipse's semi-major, semi-minor axes and rotation angle in degree units.
+let draggedElemClass = undefined; // when drag and drom starts, will hold className of dragged HTML element.
+//*************************** events ********************************
+document.addEventListener("mousedown",dragAndDrop); // all 4 mouse events required to perform SVG editing will call one function, passing as argument mouse event object.
+document.addEventListener("mousemove",dragAndDrop);
+document.addEventListener("mouseup",dragAndDrop);
+document.addEventListener("click",dragAndDrop);
+//*************************** logic *********************************
+function dragAndDrop(e){ // e parameter is mouse event object, passed by the mouse event.
+    e.preventDefault(); // cancel default browser behavior.
+    const rect = contElem.getBoundingClientRect(); // getBoundingClientRect() method returns object containing the size and position of an element relative to the viewport. 
+    const [mX,mY] = [e.clientX-rect.left,e.clientY-rect.top]; // destructuring assignment syntax. Assign to variables mX and mY current relative(to the container) mouse cursor coordinates.
+    if(e.type === "click"){ // id mouse event is "click".
+        if(e.target.tagName !== "path") return; // if "click" if fired not by SVG path element, do nothing and return.
+        updateSVG(...dAttrValues(e.target)); // dAttrValues function returns an array containing all parameters of 'd' attribute of SVG path element. ... is spread operator to "expand" an array into its element, to pass them as arguments to updateSVG function. 
+    }
+    if(e.type === "mousedown"){ // if mouse event is "mousedown". When mouse is pressed on draggable points - drag and drom operation stats.
+        if(!e.target.matches(".point")) return; // if event is fired by not one of 5 divs representing draggable points - return.
+        [initialX,initialY] = [mX,mY]; // destructuring assignment syntax. Save initial mouse coordinate
+        [initialLeft,initialTop] = [parseInt(e.target.style.left),parseInt(e.target.style.top)]; // destructuring assignment syntax. Save initial draggable div coordinates.
+        [initialRadX,initialRadY,initialRot] = [dAttrValues()[2],dAttrValues()[3],dAttrValues()[4]]; // save initial semi-major, semi-minor axes, and initial ellipse rotation angle (degree units).
+        draggedElemClass = e.target.className; // assing global variable draggedElemClass to the class name of the dragged div element. T 
+    }
+    if(e.type === "mousemove"){ // if mouse event is "mousemove"
+        if(!draggedElemClass) return; // this variable serve not only to select dragged div element, but as a flag to signify that drag and drop is currently active.
+        const classSelector = draggedElemClass.split(" ").reduce((acc,v)=>acc+"."+v,""); // construct selector from class name.
+        const elem = document.querySelector(classSelector); // select element to drag and drop.
+        const [mdX,mdY] = [mX-initialX,mY-initialY]; // destructuring assignmen syntax. mdX, mdY - distances travelled by mouse pointer since drag and drom started.
+        const switchObj = { // this object literal will serve as replacement of JS 'switch' statement. Google 'Replacing switch statements with Object literals' if it is new to you.
+            ".point.start": ()=>{ // start point. 
+                const [left,top] = [initialLeft+mdX,initialTop+mdY]; // Using destructuring assignment syntax, assign to left, top variables updated(mouse is moving) divs coordinates.
+                elem.style = `left:${left}px;top:${top}px;`; // position dragged element.
+                updateSVG(left,top,...dAttrValues().slice(2)); // call updateSVG. Cut off from path 'd' attibute parameters, returned by dAttrValues() function as an array, 2 first elements(it is start point x and y), and replace them with updated coordinates. 
+            },
+            ".point.end": ()=>{ // end point. The same logic as for start point.
+                const [left,top] = [initialLeft+mdX,initialTop+mdY];
+                elem.style = `left:${left}px;top:${top}px;`;
+                updateSVG(...dAttrValues().slice(0,-2),left,top); 
+                
+            },
+            ".point.rad-x": ()=>{ // More complicated then start and end points. This point movement is restricted along semi-major ellipse's axis. So some math implented tor find projection of mouse movement vector (mdX,mdY) on semi-major axis vector (vx,vy). Formula used: projection a onto b = (a·b)/(b·b) * b. Where a·b is dot product of a and b. 
+                const [vx,vy] = [initialX-xc,initialY-yc];
+                const scalar = (mdX*vx+mdY*vy)/(vx*vx+vy*vy);
+                const [left,top] = [initialLeft+scalar*vx,initialTop+scalar*vy];
+                elem.style = `left:${left}px;top:${top}px;`;
+                let radX = initialRadX+Math.sign(scalar)*Math.hypot(scalar*vx,scalar*vy);
+                updateSVG(...dAttrValues().toSpliced(2,1,radX)); // updateSVG, replacing in passed argument's semi-major axis.
+            },
+            ".point.rad-y": ()=>{ // the same logic for semi-minor axis.
+                const [vx,vy] = [initialX-xc,initialY-yc];
+                const scalar = (mdX*vx+mdY*vy)/(vx*vx+vy*vy);
+                const [left,top] = [initialLeft+scalar*vx,initialTop+scalar*vy];
+                elem.style = `left:${left}px;top:${top}px;`;
+                let radY = initialRadY+Math.sign(scalar)*Math.hypot(scalar*vx,scalar*vy);
+                updateSVG(...dAttrValues().toSpliced(3,1,radY)); // updateSVG, replacing in passed argument's semi-minor axis.
+            },
+            ".point.rot": ()=>{ 
+                const ß = Math.atan2(mY-yc,mX-xc); // calculate rotation angle(in radians) around ellipse's center, for dragged point.
+                updateSVG(...dAttrValues().toSpliced(4,1,Math.round((ß)/π*180))); // updateSVG, replacing in passed argument's rotation angle.
+            },
+        }
+        switchObj[classSelector](); // calls respective function(which is the value of oblect literal). 
+    }
+    if(e.type === "mouseup"){ // if mouse event is "mouseup". Means the end of drag and drop operation. 
+        draggedElemClass = undefined; // this global variable hold dragged elemenen class name, or undifined when drag and drop is not active.
+    }
+    function dAttrValues(elem = undefined){ // this function accept element(one of 4 path elements).
+        if(elem === undefined){ // if function is called without argument.
+            ["arc00","arc01","arc10","arc11"].forEach(id=>{ // forEach loop through all 4 path elements. Checks for 'stroke' attribute, if it has red color "#f14005" that means it is the selected path element. 
+                el = document.querySelector(`#${id}`);
+                if(el.getAttribute("stroke") === "#f14005") elem = el;
+            });
+        }
+        return elem.getAttribute("d").split(" ").filter(v=>!isNaN(v)).map(v=>parseInt(v)); // Get the path element's atrribute 'd' - it is the string, containin parametes and 2 letters 'A' and 'M'. This array methods convert string to array, filter out 2 letters, convert array element to integers, and return this array.
+    }
+}
+function updateSVG(x1,y1,radX,radY,rot,largeArc,sweep,x2,y2){ // function receive all required agruments to contruct the ellipse: start point coordinates (x1,y1), semi-major ellipse axis, semi-minor ellipse axis, large arc flag, sweep flag, end point coordinates.  
+    [[0,0],[0,1],[1,0],[1,1]].forEach(flags=>{ // There are 4 possible arcs to connect this 2 points, depending on passed arguments largeArc and sweep, we set "stroke" attribute for selected arc to red color "#f14005", the rest 3 arcs will be gray "#aaaaaa".
+        const pathElem = document.querySelector(`#arc${flags[0]}${flags[1]}`); // within forEach loop constract all 4 path element IDs(arc00,arc01,arc10,arc11) and assign this paht elements to variable pathElem.
+        pathElem.setAttribute("d","M "+x1+" "+y1+" A "+radX+" "+radY+" "+rot+" "+flags[0]+" "+flags[1]+" "+x2+" "+y2); // update all parameters for current path element.
+        const stroke = (flags[0] === largeArc && flags[1] === sweep) ? "#f14005" : "#aaaaaa"; //if large arc flag and sweep flag equal to the current element flags, set it as active, by setting its stoke attibute to red color "#f14005". If not, 3 rest args are gray, color "#aaaaaa".
+        pathElem.setAttribute("stroke",stroke); // set stroke attribute for current path element.
+    });
+    // next 7 lines of code set textContent for span elements within header to dispaly modified SVG.
+    document.querySelector("#start-point").textContent = ` ${x1} ${y1} `;
+    document.querySelector("#end-point").textContent = ` ${x2} ${y2} `;
+    document.querySelector("#radius-x").textContent =` ${parseInt(radX)}`;
+    document.querySelector("#radius-y").textContent = ` ${parseInt(radY)}`;
+    document.querySelector("#rotation").textContent = ` ${parseInt(rot)}`;
+    document.querySelector("#large-arc-flag").textContent = ` ${largeArc}`;
+    document.querySelector("#sweep-flag").textContent = ` ${sweep}`;
+    // Calculate center of ellipse.
+    const Θ = rot/180*π; // greek theta. alt code 233. Ellipse's rotation angle in radians.
+    // Math, to calculate ellipse's center coordinates. When given: rotation angle Θ, semi-major axis radX, semi-minor axis radY, 2 points on ellipse (x1,y1) and (x2,y2).
+    const x1el = x1*Math.cos(Θ)+y1*Math.sin(Θ); // rotate the given points (x1,y1) and (x2,y2) back by the angle -Θ to align to the ellipse with the standard axes.
+    const y1el = -x1*Math.sin(Θ)+y1*Math.cos(Θ);
+    const x2el = x2*Math.cos(Θ)+y2*Math.sin(Θ);
+    const y2el = -x2*Math.sin(Θ)+y2*Math.cos(Θ);
+    // The standard equation of an ellipse centered at (h,k) with semi-major axix radX and semi-minor axis radY is: (x-h)**2/radX**2+(y-k)**2/radY**2 = 1.
+    // Substitute the transformed points (x1el,y1el) and (x2el,y2el) into this equation to get two equations:
+    // (x1el-h)**2/radX**2 + (y1el-k)**2/radY**2 = 1    (1)
+    // (x2el-h)**2/radX**2 + (y2el-k)**2/radY**2 = 1    (2)
+    // Subtrace equation (2) from equation (1) to eliminate the constants:
+    // ((x1el-h)**2-(x2el-h)**2)/radX**2 + ((y1el-k)**2-(y2el-k)**2)/radY**2 = 0
+    // Expand and simplify to get linear equation in h and k of the form: Ah+Bk = C     (3)
+    // Where A = 2*(x1el-x2el)radX**2, B = 2*(y1el-y2el)/radY**2, C = (x1el**2-x2el**2)/radX**2+(y1el**2-y2el**2)/radY**2.
+    // From (3) we can express k in terms of h: k = (C-Ah)/B
+    // Now, substitute this into (1) to solve for h:
+    // (x1el-h)**2/radX**2 + (y1el-(C-Ah)/B)**2/radY**2 = 1
+    // This is a quadratic equation in h, which can be solved symbolically.
+    // Let D = y1el-C/B and E = A/B, then 
+    // (x1el-h)**2/radX**2 + (D+Eh)**2/radY**2 = 1
+    // Expand and combine to form: (1/radX**2+E**2/radY**2)h**2 + (-2*x1el/radX**2+2*D*E/radY**2)h + x1el**2/radX**2+(y1el-C/B)**2/radY**2-1 = 0
+    // This is a quadratic equation in h: Ph**2 + Qh + R = 0, where:
+    //  P = 1/radX**2+E**2/radY**2, Q = -2*x1el/radX**2+2*D*E/radY**2, x1el**2/radX**2+(y1el-C/B)**2/radY**2-1
+    // This quadratic equation has two solutions h = (-Q+Math.sqrt(Q**2-4*P*R))/(2*P), h = (-Q-Math.sqrt(Q**2-4*P*R))/(2*P). And respectively two solutioins for k = (C-Ah)/B. 
+    // After h,k is found, we must rotate them back in the original frame:
+    // xc = hcos(Θ)-ksin(Θ), yc = hsin(Θ)+kcos(Θ)
+    // Next code lines implement this math. Finding center coordinates for 2 possible ellipses. 
+    const A = 2*(x1el-x2el)/radX**2; 
+    const B = 2*(y1el-y2el)/radY**2;
+    const C = (x1el**2-x2el**2)/radX**2+(y1el**2-y2el**2)/radY**2;
+    const D = y1el-C/B, E = A/B;
+    const P = 1/radX**2+E**2/radY**2;
+    const Q = -2*x1el/radX**2+2*D*E/radY**2;
+    const R = x1el**2/radX**2+(y1el-C/B)**2/radY**2-1;
+    const h1 = (-Q+Math.sqrt(Q**2-4*P*R))/(2*P);
+    const k1 = (C-A*h1)/B;
+    const xc1 = h1*Math.cos(Θ)-k1*Math.sin(Θ);
+    const yc1 = h1*Math.sin(Θ)+k1*Math.cos(Θ);
+    const h2 = (-Q-Math.sqrt(Q**2-4*P*R))/(2*P);
+    const k2 = (C-A*h2)/B;
+    const xc2 = h2*Math.cos(Θ)-k2*Math.sin(Θ);
+    const yc2 = h2*Math.sin(Θ)+k2*Math.cos(Θ);
+    if(largeArc === sweep){ // depending on large arc flag, we must choose on which side of the vector (vector from the start point (x1,y1) to end point (x2,y2)) is selected ellipse. Because when poins are moved, selected arc must remain on the correct side.
+        [xc,yc] = (y2-y1)*xc1+(x1-x2)*yc1+(x2*y1-x1*y2) > 0 ? [xc1,yc1] : [xc2,yc2]; // Given two points (x1,y1) and (x2,y2), the two-point form of line is: (y-y1)/(y2-y1) = (x-x1)/(x2-x1). 
+        // But to determine the side of an arbitrary point(in our case, it will be ellipse's center), it's easier to convert this to the general line form Ax+By+C = 0. 
+        // Rearrange the two-point form: (y-y1)(x2-x1) = (x-x1)(y2-y1)
+        // Expand and simplify: (y2-y1)x - (x2-x1)y + (x2y1-x1y2) = 0
+        // So, the coefficients are: A = y2-y1, B = x1-x2, C = x2y1-x1y2
+        // Plug in center point into general form D = Ax + By + C
+        // If D > 0 , center point is on one side of the line, if D < 0 is on the other side.
+        // Ternary operator will assign(using destructuring assignment syntax) center point coordinates to one of the 2 possible centers, to keep it on one side.
+    }else{
+        [xc,yc] = (y2-y1)*xc1+(x1-x2)*yc1+(x2*y1-x1*y2) < 0 ? [xc1,yc1] : [xc2,yc2];
+    }
+    // after center point coordinates are calculated. We set all required attributes for SVG lines and CSS properties for draggable points 🔛 and 🔄.
+    semiMajorElem.setAttribute("x1",xc); 
+    semiMajorElem.setAttribute("y1",yc);
+    const [radXx,radXy] = [xc+radX*Math.cos(Θ),yc+radX*Math.sin(Θ)];
+    semiMajorElem.setAttribute("x2",radXx);
+    semiMajorElem.setAttribute("y2",radXy);
+    radXPointElem.style = `left:${radXx-12}px;top:${radXy-12}px;`;
+    radXPointElem.style.transform = `rotate(${rot}deg)`;
+    semiMinorElem.setAttribute("x1",xc);
+    semiMinorElem.setAttribute("y1",yc);
+    const [radYx,radYy] = [xc+radY*Math.cos(Θ-π/2),yc+radY*Math.sin(Θ-π/2)];
+    semiMinorElem.setAttribute("x2",radYx);
+    semiMinorElem.setAttribute("y2",radYy);
+    radYPointElem.style = `left:${radYx-12}px;top:${radYy-12}px;`;
+    radYPointElem.style.transform = `rotate(${rot-90}deg)`;
+    rotPointElem.style = `left:${xc+radX*Math.cos(Θ)/2-12}px;top:${yc+radX*Math.sin(Θ)/2-12}px;`
+    rotPointElem.style.transform = `rotate(${rot}deg)`;
+}
+//*************************** start here ****************************
+onload = ()=>{
+    const [w,h] = [contElem.offsetWidth,contElem.offsetHeight]; // destructuring assignment syntax. w and h are container element's width and height.
+    svgElem.setAttribute("width",w); // SVG width
+    svgElem.setAttribute("height",h); // SVG height
+    document.querySelector("#svg-width").textContent = w; // display SVG widht and height
+    document.querySelector("#svg-height").textContent = h;
+    startPointElem.style = `left:${w/5*2}px;top:${h/5*2}px;`; // set start poing position.
+    endPointElem.style = `left:${w/5*3}px;top:${h/5*3}px;`; // set end point position.
+    const dist = Math.hypot(w/5,h/5); // lets assume initial distance between start and end points equal to one fifth of the vector's from (0,0) to (w,h) length.
+    updateSVG(parseInt(w/5*2),parseInt(h/5*2),dist/2*1.8,dist/2*1.1,45,0,0,parseInt(w/5*3),parseInt(h/5*3)); // call updateSVG with initial arguments. 
+}
+//*******************************************************************
+        </script>
+    </body>
+</html>
