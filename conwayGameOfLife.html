@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Conway's Game of Life</title>
+        <style> /* internal style. */
+            *{ /* universal selector. Selects all elements. */
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box; /* include the padding and border in an element's total width and height. */
+                font: 20px Arial; /* readability. */
+            }
+            #wrapper{ /* id selector. */
+                width: 100vw; /* 100% of the viewport's width. */
+                height: 100vh; /* 100% of the viewport's height. */
+                display: flex; /* to organize header and main elements. */
+                flex-direction: column; /* items are discplayed vertically (main axis is vertical). */
+            }
+            header{ /* type selector. */
+                width: 100%; /* 100% of parent's width. */
+                height: 60px; /* it's ok for control elements. */
+                background-color: seaGreen; /* all color choices are up to you. */
+                display: flex; /* to organize input elements inside header. */
+                justify-content: space-evenly; /* equal space around items on the main axis. */
+                align-items: center; /* items in the center on the cross axis. */
+            }
+            main{ /* type selector. */
+                width: 100%; /* 100% of the parent's width. */
+                height: 100%; /* 100% of remaining free height. */
+                background-color: chocolate;
+                position: relative; /* to position: abosute; canvas. */
+                display: grid; /* only one purpose, for place-self: center of its child canvas to work. */
+            }
+            canvas{ /* type selector. */
+                background-color: khaki;
+                position: absolute;
+                place-self: center; /* CSS shorthand property. t combines align-self and justify-self into a single declaration. Place item in the grid center. */
+            }
+        </style>
+    </head>
+    <body>
+        <div id="wrapper"> <!-- wrapps everything and occupies the whole viewport. -->
+            <header> <!-- semantic THML element. Contain all input elements. -->
+                <div style="min-width:105px;">Cell: <span class="cell-size"></span>px<br>
+                    <input type="number" class="cell-size" min="4" max="50" value="10" autocomplete="off">
+                </div>
+                <div>Grid<br>
+                    <input type="checkbox" class="show-grid" checked autocomplete="off" style="width:20px;height:20px;">
+                </div>
+                <div>Density: <span class="density"></span>%<br>
+                    <input type="range" class="density" min="0" max="100" value="30" autocomplete="off">
+                </div>
+                <div>Cycle time: <span class="cycle-time"></span>ms<br>
+                    <input type="range" class="cycle-time" min="100" max="1000" value="500" autocomplete="off">
+                </div>
+                <button class="btn-start" style="width:100px;">Start</button>
+            </header>
+            <main><!-- container for canvas. Also serve to center canvas within itself. -->
+                <canvas></canvas> <!-- since here is only one canvas element, no id or class. Type selector will be used. -->
+            </main>
+        </div>
+        <script>
+//*************************** global variable ***********************
+const headerElem = document.querySelector("header");
+const mainElem = document.querySelector("main");
+const canvasElem = document.querySelector("canvas");
+const ctx = canvasElem.getContext("2d");
+// JS will compute and assign values to all varialbles listed below.
+let cellSize, rowQt, colQt; // cell size in pixels, number of rows an colums.
+let showGrid; // boolean flag, to display grid or not.
+let density; // variable to populate the cells. Slide input element control this variable setting it in range from 0(no alive cells) to 100(all cells are alive).
+let cycleTime; // time for each life cycle in milliseconds.
+let cells; // this 2d array will be initialized by JS.
+let intervalId; // the identifier of setInterval(), needed to stop it.
+//*************************** events ********************************
+headerElem.addEventListener("input",updateParam); // any input event from input elements inside header will fire this event.
+canvasElem.addEventListener("click",flipCell); // click on canvas will flip the cell from alive to empty and vice versa.
+document.querySelector("button.btn-start").addEventListener("click",()=>{
+    intervalId = setInterval(nextCycle,cycleTime); // click of start button will 
+});
+//*************************** logic *********************************
+function updateParam(e){ // "read" values from input elements and update respective global variables first, then draw canvas with cells on it.
+    showGrid = document.querySelector("input.show-grid").checked; // boolean frag controlled by checkbox.
+    if(e?.target?.type === "checkbox") { // ?. optional chaining operator  avoid errors from being thrown, since updateParam() will be called once without event object e argument (at the start from onload event). If event which fired updateParam is checkbox, we just need to render all again (with or without grid) and return.
+        renderCells();   
+        return;
+    }
+    if(intervalId) { // i.e. intervalId !== undefined, means setInteraval is active and needs to be stopped.
+        clearInterval(intervalId); // stop setInterval
+        intervalId = undefined; // assign intervalId to undefined. 
+    }
+    cycleTime = Number(document.querySelector("input.cycle-time").value); // will be delay for setInteval function later.
+    document.querySelector("span.cycle-time").textContent = cycleTime; // display it.
+    if(e?.target.matches("input.cycle-time")) { // ?. opional chaining operator and matches element method check if event was fired by cycle time slider.
+        intervalId = setInterval(nextCycle,cycleTime); // call setInterval with updated delay, and return(non need to change anything else).
+        return;
+    }
+    cellSize = Number(document.querySelector("input.cell-size").value); // cell size in pixels.
+    document.querySelector("span.cell-size").textContent = cellSize; // display cell size.
+    density = Number(document.querySelector("input.density").value); // density will control random initial 2d array population.
+    document.querySelector("span.density").textContent = density; // display it.
+    rowQt = Math.floor(mainElem.offsetHeight/cellSize); // calculate number of rows to fit within a main element.
+    colQt = Math.floor(mainElem.offsetWidth/cellSize); // ... columns
+    canvasElem.width = colQt*cellSize; // set canvas width.
+    canvasElem.height = rowQt*cellSize; // set canvas height.
+    cells = Array.from({length: rowQt}, ()=>Array.from({length: colQt}, ()=>({currState: 0, nextState: 0}))); // initialize 2D array of objects. Object will have 2 properties: current state and next state.
+    scanCells(function(r,c){ // pass this function as argument to scanCells.
+        cells[r][c].currState = Math.floor(Math.random()*100) >= density ? 0 : 1; // depending on density variable populate 2d array.
+    });
+    renderCells(); // must show what is done.
+}
+
+function flipCell(e){ // called by click event on canvas. Accepts mouse event object e, to calculate relative mouse curson coordinates within canvas.
+    const rect = canvasElem.getBoundingClientRect(); // DOMRect object with 8 properties, we need left and top.
+    const [mX, mY] = [e.clientX-rect.left, e.clientY-rect.top]; // destructuring assignment syntax, assing to mX,mY curren relative mouse coordinate within canvas.
+    const [r,c] = [Math.floor(mY/cellSize), Math.floor(mX/cellSize)]; // destructuring assignement syntax. r,c are respective to mouse position, row and collumn within cells 2d array.
+    cells[r][c].currState = cells[r][c].currState ? 0 : 1; // invert the values of currState property.
+    renderCells(); // render cells to display change (clicke cell is flipped).
+}
+function renderCells(){ // draws all cells of canvas and grid(if showGrid is true).
+    ctx.clearRect(0,0,canvasElem.width,canvasElem.height); // eraze everything on canvas.
+    scanCells((r,c)=>{ // pass this function as argument to scanCells function.
+        ctx.fillStyle = cells[r][c].currState ? "green" : "khaki"; // set fill style depending of currentState object property(1 or 0), using turnary operator.
+        ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize); // draw rectangle.
+    });
+    if(cellSize > 4 && showGrid){ // conditions to draw the grid.
+        ctx.strokeStyle = "#222"; // dark gray will be visible on green.
+        ctx.lineWidth = 1; // line width in pixels.
+        for(let i = cellSize; i < canvasElem.width; i += cellSize){ // loop to draw vertical grid lines on canvas.
+            ctx.beginPath(); // begins current path.
+            ctx.moveTo(i,0); // moves the path to (i,0) point without drawing a line.
+            ctx.lineTo(i,canvasElem.height); // draw a line from the last point (i,0) to point (i,canvasElem.height)
+            ctx.stroke(); // draws the current path.
+        }
+        for(let i = cellSize; i < canvasElem.height; i += cellSize){ // the same logic for horizontal grid lines.
+            ctx.beginPath();
+            ctx.moveTo(0,i);
+            ctx.lineTo(canvasElem.width,i);
+            ctx.stroke();
+        }
+    }
+}
+function nextCycle(){ // compute next cells generation according to game rules.
+    scanCells((r,c)=>{ // this arrow function is passed as argument to scanCells function.
+        const cell = cells[r][c].currState; // current state (1 or 0 - alive or empty cell).
+        const neighbors = // number of alive neighbors around current (r,c) cell, where r is row and c is column. 
+            [-1,0,1].reduce((total,x)=> // reduce array method on array [-1,0,1]. Curren value x will be -1, 0, and 1 for respective iteration.
+                total+ // accumulator will hold total number of alive neighbors.
+                [-1,0,1].reduce((sum,y)=> // the same, but now current value is y.
+                    sum+(x || y ? (cells[r+x]?.[c+y]?.currState || 0) : 0), // x || y will evaluate to false when both reduce methods iterate on 0 value, meaning cells[r+x].[c+y] points on current cell and not on neighboring cell, and this case must be considered as empty cell. That is what ternary operator do. Optional chaining ?. followed by logical OR(||) handles edge cases, when neighbor is outside cells array.
+                0), // initial accumulator value for reduce((sum,y)=>...
+            0); // initila accumulator value for reduce((total,x)=>...
+        cells[r][c].nextState = (cell && (neighbors === 2 || neighbors === 3)) || (!cell && neighbors === 3) ? 1 : 0; // set nextState object property for the current cell in 2D cells array to 1 or 0 (alive or empty) according to rules and number of neighbors.
+    });
+    scanCells((r,c)=>{ // pass this function as argument ot scanCells.
+        cells[r][c].currState = cells[r][c].nextState; // copy computed nextState to current state. This can be done only after the whole array next generation(state) is computed.
+    });
+    renderCells(); // draw cells on tha canvas.
+}
+function scanCells(callbackFn){ // this function accept another function as argument. Than loops through rows and colums i.e. all cells, running supplied function, passing to this function row and collumn number for current iteration. 
+    for(let r = 0; r < rowQt; r++){
+        for(let c = 0; c < colQt; c++){
+            callbackFn(r,c);
+        }
+    }
+}
+//*************************** start here ****************************
+onload = ()=>{ // this event fires after DOM is build and all dependent resourse load. 
+    updateParam(); // call updateParam to set initial values and display cells on canvas, not waiting for some input event.
+}
+//*******************************************************************
+        </script>
+    </body>
+</html>
