@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Display CSS Greed</title>
+        <style> /* internal style. */
+            *{ /* universal selector. Selects all elements. */
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box; /* include the padding and the border in an element's total width and height. */
+            }
+            #wrapper{
+                width: 100vw; /* 100% of the viewports width. */
+                height: 100vh; /* 100% of the viewports height. */
+                display: flex; /* flex layout. */
+                flex-wrap: wrap; /* flexible items with wrap if necessary. */
+            }
+            /* arbitrary div elements styled to fit inside the wrapper div, each one of them have some grid layout, for demonstration purpose. */
+            #box1{
+                width: 66vw; 
+                height: 66vh;
+                background-color: salmon;
+                display: grid;
+                grid-template-rows: 1fr 2fr 20px 1fr 3em;
+                grid-template-columns: 1fr 30px 1fr 1fr;
+            }
+            #box2{
+                width: 34vw;
+                height: 66vh;
+                background-color: royalBlue;
+                display: grid;
+                grid-template-rows: 1fr 2fr 3em;
+                grid-template-columns: 30px 1fr 1fr;
+            }
+            #box3{
+                width: 20vw;
+                height: 34vh;
+                background-color: mediumOrchid;
+                display: grid;
+                grid-template-rows: repeat(5,1fr);
+            }
+            #box4{
+                width: 55vw;
+                height: 34vh;
+                background-color: seaGreen;
+                display: grid;
+                grid-template-rows: 1fr 2fr 1fr;
+                grid-template-columns: 2fr 1fr 2fr;
+            }
+            #box5{
+                width: 25vw;
+                height: 34vh;
+                background-color: gold;
+                display: grid;
+                grid-template-columns: repeat(20,1fr);
+            }
+            #grid-lines{ /* id selector, select canvas element. */
+                position: absolute; /* must be exluded from normal flow, and positioned by JS to overlap with div element. */
+            }
+        </style>
+    </head>
+    <body>
+        <div id="wrapper"> <!-- wrapps everything. -->
+            <div id="box1"></div> <!-- and next 4 divs, have some arbitrary grid layout. -->
+            <div id="box2"></div>
+            <div id="box3"></div>
+            <div id="box4"></div>
+            <div id="box5"></div>
+            <canvas id="grid-lines"></canvas> <!-- canvas will by styled by JS. -->
+        </div>
+        <script>
+//*************************** events ********************************
+document.addEventListener("click",displayGrid); // click on any div(box1-box5) element will call displayGrid function passing as argument mouse event object.
+//*************************** logic *********************************
+function displayGrid(e){ 
+    const canvasElem = document.querySelector("#grid-lines"); // select canvas element.
+    const ctx = canvasElem.getContext("2d"); // creates 2D context object with drawing methods.
+    const rect = e.target.getBoundingClientRect(); // returns DOMrect object, containing information abount the size and position of element relative to the viewport. e.target is the element which fire the event.
+    canvasElem.style = `left:${rect.left}px;top:${rect.top}px;` // position canvas on the same spot where the element which fire the event is.
+    canvasElem.width = rect.width; // set canvas width equal to div width.
+    canvasElem.height = rect.height; // the same for height;
+    const style = window.getComputedStyle(e.target); // returns object containing the values of all CSS properties of an element.
+    const templateRows = style.gridTemplateRows; // get grid-template-rows CSS property(as a string).
+    const templateColumns =style.gridTemplateColumns; // grid-template-columns CSS property.
+    console.log("templateRows:",templateRows); // log in console
+    console.log("templateColumns:",templateColumns);
+    templateRows // some array methods will be implemented to convert string to array of numbers, and usint reduce method draw lines on canvas.
+        .split("px") // split by "px" convert string to array of strings.
+        .map(v=>parseFloat(v)) // map elements to numbers.
+        .filter(Number) // remove last array element, which was converted from empty string "", and respectively is NaN.
+        .reduce((acc,val)=>{ // reduce method is needed to accumulate sum of rows heights.
+            acc += val; // increse accumulator by row's height.
+            drawLine(0,acc,canvasElem.width,acc); // draw horizontal line.
+            return acc; // returns accumulator for next iteration.
+        }, 0); // initial value for accumulator for reduce method.
+    templateColumns // the same logic for columns.
+        .split("px")
+        .map(v=>parseFloat(v))
+        .filter(Number)
+        .reduce((acc,val)=>{
+            acc += val;
+            drawLine(acc,0,acc,canvasElem.height);
+            return acc;
+        }, 0);
+    function drawLine(x1,y1,x2,y2){ // accept start and end point's coordinates on canvas, and draw a line between them.
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#111";
+        ctx.beginPath();
+        ctx.moveTo(x1,y1);
+        ctx.lineTo(x2,y2);
+        ctx.stroke();
+    }
+}
+//*******************************************************************
+        </script>
+    </body>
+</html>
